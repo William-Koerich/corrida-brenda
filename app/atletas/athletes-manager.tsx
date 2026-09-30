@@ -177,7 +177,7 @@ export function AthletesManager({ race }: { race: Race }) {
                 <BibChip bib={a.bib_number} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium">{a.name}</span>
-                  <span className="text-sm text-ink-soft">{a.age} anos</span>
+                  {a.age != null && <span className="text-sm text-ink-soft">{a.age} anos</span>}
                 </span>
                 <SexBadge sex={a.sex} />
                 <div className="flex gap-1">

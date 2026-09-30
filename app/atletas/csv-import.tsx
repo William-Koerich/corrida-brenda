@@ -56,8 +56,8 @@ export function CsvImportDialog({ open, onClose, existingBibs, onImport }: Props
       title="Importar atletas por CSV"
       description={
         <>
-          Colunas <code className="rounded bg-canvas px-1">nome, idade, sexo, numero</code>, separadas por vírgula ou
-          ponto e vírgula.
+          Colunas <code className="rounded bg-canvas px-1">nome, sexo, numero</code> e, se quiser,{" "}
+          <code className="rounded bg-canvas px-1">idade</code>. Separadas por vírgula ou ponto e vírgula.
         </>
       }
       footer={

@@ -2,7 +2,8 @@ import type { Sex } from "./types";
 
 export interface AthleteInput {
   name: string;
-  age: number;
+  /** opcional */
+  age: number | null;
   sex: Sex;
   bib_number: number;
 }
@@ -38,17 +39,19 @@ export type ValidationResult =
 export function validateAthlete(raw: RawAthlete): ValidationResult {
   const errors: string[] = [];
   const name = raw.name.trim().replace(/\s+/g, " ");
-  const age = parsePositiveInt(raw.age);
+  // idade é opcional: vazio vira null; se preenchida, precisa ser válida
+  const ageText = raw.age.trim();
+  const age = ageText === "" ? null : parsePositiveInt(ageText);
   const sex = normalizeSex(raw.sex);
   const bib = parsePositiveInt(raw.bib);
 
   if (!name) errors.push("Nome é obrigatório");
-  if (age === null || age > 120) errors.push("Idade inválida");
+  if (ageText !== "" && (age === null || age > 120)) errors.push("Idade inválida");
   if (!sex) errors.push("Sexo deve ser M ou F");
   if (bib === null) errors.push("Número de peito inválido");
 
   if (errors.length) return { ok: false, errors };
-  return { ok: true, athlete: { name, age: age!, sex: sex!, bib_number: bib! } };
+  return { ok: true, athlete: { name, age, sex: sex!, bib_number: bib! } };
 }
 
 export function stripAccents(s: string): string {

@@ -74,7 +74,7 @@ export function resultsToCsv(rows: ResultRow[], distanceKm: number): string {
       sexPosition,
       r.athlete.bib_number,
       r.athlete.name,
-      r.athlete.age,
+      r.athlete.age ?? "",
       SEX_LABEL[r.athlete.sex],
       formatDuration(r.elapsedMs),
       formatPace(r.elapsedMs, distanceKm).replace(" /km", ""),

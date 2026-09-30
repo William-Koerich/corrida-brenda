@@ -15,7 +15,8 @@ export interface Athlete {
   id: string;
   race_id: string;
   name: string;
-  age: number;
+  /** opcional */
+  age: number | null;
   sex: Sex;
   bib_number: number;
   created_at: string;

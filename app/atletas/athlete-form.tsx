@@ -20,7 +20,7 @@ interface Props {
 
 export function AthleteForm({ editing, isBibTaken, onSubmit, onCancel }: Props) {
   const [name, setName] = useState(editing?.name ?? "");
-  const [age, setAge] = useState(editing ? String(editing.age) : "");
+  const [age, setAge] = useState(editing?.age != null ? String(editing.age) : "");
   const [sex, setSex] = useState<Sex | "">(editing?.sex ?? "");
   const [bib, setBib] = useState(editing ? String(editing.bib_number) : "");
   const [errors, setErrors] = useState<string[]>([]);
@@ -55,7 +55,7 @@ export function AthleteForm({ editing, isBibTaken, onSubmit, onCancel }: Props) 
     <Card>
       <CardHeader
         title={editing ? `Editar atleta nº ${editing.bib_number}` : "Novo atleta"}
-        description={editing ? editing.name : "Todos os campos são obrigatórios."}
+        description={editing ? editing.name : "Nome, número e sexo são obrigatórios."}
       />
       <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-5">
         <Field label="Nome">
@@ -63,7 +63,7 @@ export function AthleteForm({ editing, isBibTaken, onSubmit, onCancel }: Props) 
         </Field>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Idade">
+          <Field label="Idade (opcional)">
             <Input value={age} onChange={(e) => setAge(e.target.value)} inputMode="numeric" placeholder="Ex.: 32" />
           </Field>
           <Field label="Número de peito">

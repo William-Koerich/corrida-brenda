@@ -18,7 +18,7 @@ const COLUMN_ALIASES: Record<"name" | "age" | "sex" | "bib", string[]> = {
 };
 
 /**
- * Lê um CSV de atletas com cabeçalho (nome, idade, sexo, numero).
+ * Lê um CSV de atletas com cabeçalho (nome, sexo, numero e, opcionalmente, idade).
  * Aceita separador "," ou ";" (Excel em português), aspas e BOM.
  * Números já cadastrados (existingBibs) e repetidos no arquivo viram erro.
  */
@@ -42,7 +42,7 @@ export function parseAthletesCsv(
   const missing: string[] = [];
   for (const key of Object.keys(COLUMN_ALIASES) as (keyof typeof COLUMN_ALIASES)[]) {
     col[key] = header.findIndex((h) => COLUMN_ALIASES[key].includes(h));
-    if (col[key] === -1) missing.push(COLUMN_ALIASES[key][0]);
+    if (col[key] === -1 && key !== "age") missing.push(COLUMN_ALIASES[key][0]);
   }
   if (missing.length) {
     return {
@@ -61,7 +61,7 @@ export function parseAthletesCsv(
     if (isBlank(cells)) continue;
     const result = validateAthlete({
       name: cells[col.name] ?? "",
-      age: cells[col.age] ?? "",
+      age: col.age === -1 ? "" : (cells[col.age] ?? ""),
       sex: cells[col.sex] ?? "",
       bib: cells[col.bib] ?? "",
     });

@@ -109,6 +109,11 @@ describe("podiums", () => {
 });
 
 describe("resultsToCsv", () => {
+  it("CSV deixa a idade vazia quando não informada", () => {
+    const { rows } = buildResults(race, [{ ...athlete(9, "Rui", 0, "M"), age: null }], [finish("a9", 900)]);
+    expect(resultsToCsv(rows, 3).split("\r\n")[1]).toBe("1;1;9;Rui;;Masculino;00:15:00;5:00");
+  });
+
   it("gera CSV com ; e BOM, posição no sexo e campos escapados", () => {
     const { rows } = buildResults(
       race,

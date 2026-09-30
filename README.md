@@ -94,7 +94,7 @@ e abra no celular `https://<IP-do-computador>:3000`, com o IP que o Next mostra 
 
 ## Importar atletas por CSV
 
-Em `/atletas` → **Importar CSV**. O arquivo precisa de cabeçalho com as colunas `nome, idade, sexo, numero`, em qualquer ordem. O separador pode ser vírgula ou ponto e vírgula (padrão do Excel em português).
+Em `/atletas` → **Importar CSV**. O arquivo precisa de cabeçalho com as colunas `nome, sexo, numero`, em qualquer ordem. A coluna `idade` é **opcional**: pode faltar no arquivo ou ficar em branco em algumas linhas. O separador pode ser vírgula ou ponto e vírgula (padrão do Excel em português).
 
 - Sexo aceita `M`/`F`, `masculino`/`feminino`, `masc`/`fem`.
 - Antes de importar, a tela mostra uma prévia com os erros por linha (número repetido, já cadastrado, idade inválida…). Só as linhas válidas são importadas.

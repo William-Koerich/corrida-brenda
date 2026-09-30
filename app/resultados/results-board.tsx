@@ -161,10 +161,11 @@ export function ResultsBoard({ race }: { race: Race }) {
                     <td className="px-2 py-2.5">
                       <span className="font-medium">{r.athlete.name}</span>
                       <span className="block text-sm text-ink-soft sm:hidden">
-                        {r.athlete.age} anos · {r.athlete.sex}
+                        {r.athlete.age != null ? `${r.athlete.age} anos · ` : ""}
+                        {r.athlete.sex}
                       </span>
                     </td>
-                    <td className="hidden px-2 py-2.5 text-ink-soft sm:table-cell">{r.athlete.age}</td>
+                    <td className="hidden px-2 py-2.5 text-ink-soft sm:table-cell">{r.athlete.age ?? "—"}</td>
                     <td className="hidden px-2 py-2.5 sm:table-cell">
                       <SexBadge sex={r.athlete.sex} />
                     </td>

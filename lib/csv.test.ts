@@ -58,6 +58,15 @@ describe("parseAthletesCsv", () => {
     ]);
   });
 
+  it("idade é opcional: coluna ausente ou célula vazia", () => {
+    expect(parseAthletesCsv("nome;sexo;numero\nAna;F;1").athletes).toEqual([
+      { name: "Ana", age: null, sex: "F", bib_number: 1 },
+    ]);
+    const { athletes, errors } = parseAthletesCsv("nome,idade,sexo,numero\nBia,,F,2\nCaio,x,M,3");
+    expect(athletes).toEqual([{ name: "Bia", age: null, sex: "F", bib_number: 2 }]);
+    expect(errors).toEqual([{ line: 3, message: "Idade inválida" }]);
+  });
+
   it("recusa cabeçalho incompleto", () => {
     const { errors } = parseAthletesCsv("nome,idade\nAna,30");
     expect(errors[0].message).toBe("Cabeçalho sem as colunas: sexo, numero");
@@ -89,6 +98,13 @@ describe("validateAthlete", () => {
     expect(r).toEqual({
       ok: false,
       errors: ["Idade inválida", "Número de peito inválido"],
+    });
+  });
+
+  it("idade em branco é aceita como não informada", () => {
+    expect(validateAthlete({ name: "Ana", age: "  ", sex: "F", bib: "5" })).toEqual({
+      ok: true,
+      athlete: { name: "Ana", age: null, sex: "F", bib_number: 5 },
     });
   });
 
