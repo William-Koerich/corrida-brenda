@@ -1,36 +1,245 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Cronometragem — Corrida 3 km
 
-## Getting Started
+Aplicação web (PWA, mobile-first) para cronometrar uma corrida de rua de 3 km com premiação por categoria.
 
-First, run the development server:
+**Stack:** Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · Supabase (Postgres + Realtime)
+
+## Telas
+
+| Rota          | Uso                                                     |
+| ------------- | ------------------------------------------------------- |
+| `/atletas`    | Cadastro, importação CSV e PDF com números de peito     |
+| `/largada`    | Dá a largada com o horário do servidor                  |
+| `/chegada`    | Registro de chegadas no celular (botão CHEGOU, QR Code) |
+| `/resultados` | Classificação em tempo real, premiação e exportação CSV |
+| `/telao`      | Modo telão para TV: fonte grande e rolagem automática   |
+
+## 1. Configurar o Supabase
+
+1. Crie um projeto em [supabase.com](https://supabase.com).
+2. Aplique as migrações de `supabase/migrations/`, em ordem de nome, de uma destas formas:
+   - **SQL Editor** do painel: cole o conteúdo do arquivo e execute; ou
+   - **psql** (Project Settings → Database → Connection string):
+     ```bash
+     for f in supabase/migrations/*.sql supabase/seed.sql; do
+       psql "postgresql://postgres:SENHA@db.SEU-PROJETO.supabase.co:5432/postgres" -v ON_ERROR_STOP=1 -f "$f"
+     done
+     ```
+     Se a senha tiver caracteres especiais (`@`, `#`, `/`…), codifique-os na URL (`@` → `%40`) ou use a variável `PGPASSWORD`.
+
+     A conexão direta (`db.<projeto>.supabase.co`) só funciona em redes IPv6. Se der erro de conexão, use o **Session pooler** do botão **Connect** do painel. Ele muda o host e o usuário:
+     ```bash
+     PGPASSWORD='SENHA' psql "host=aws-0-<regiao>.pooler.supabase.com port=5432 dbname=postgres user=postgres.<id-do-projeto> sslmode=require" ...
+     ```
+     Esses dados do banco servem só para aplicar a migração. O app usa apenas a URL e a chave publishable (passo 2).
+   - **Supabase CLI:** `supabase link` e depois `supabase db push`.
+3. (Opcional) Rode `supabase/seed.sql` para criar a corrida “Corrida 3 km”.
+
+A migração cria:
+
+- Tabelas `races`, `athletes` e `finishes`.
+- Número de peito único por corrida e **no máximo uma chegada por atleta**. Também torna `client_id` único, para a sincronização offline não duplicar chegadas.
+- RPCs:
+  - `server_now()`: relógio do servidor, usado para calcular o offset do celular.
+  - `start_race(id)`: grava `start_time = now()` do servidor.
+  - `finish_race(id)`: encerra a corrida.
+- Realtime habilitado em `races`, `finishes` e `athletes`.
+- RLS ativado com políticas abertas (sem login por enquanto).
+
+## 2. Variáveis de ambiente
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Preencha com os valores de **Project Settings → API**:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+NEXT_PUBLIC_SUPABASE_URL=https://SEU-PROJETO.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...   # ou a chave "anon" (legada)
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Nunca coloque a senha do banco nem a chave `service_role` nessas variáveis: tudo que começa com `NEXT_PUBLIC_` vai para o navegador.
 
-## Learn More
+`DATABASE_URL` (opcional) serve só para acessar o banco pelo terminal:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run db                                         # abre o psql
+npm run db -- -f supabase/migrations/<arquivo>.sql # aplica uma migração
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 3. Rodar
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm install
+npm run dev
+```
 
-## Deploy on Vercel
+Abra http://localhost:3000. A página inicial mostra se a conexão com o Supabase funcionou e qual é a corrida atual.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### No celular (mesma rede Wi-Fi)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+A câmera só funciona em HTTPS (o navegador bloqueia em `http://` fora do `localhost`). Rode:
+
+```bash
+npm run dev:https
+```
+
+e abra no celular `https://<IP-do-computador>:3000`, com o IP que o Next mostra em "Network" (ex.: `https://192.168.1.30:3000`).
+
+- O certificado é de desenvolvimento, então o navegador mostra um aviso. Toque em **Avançado → Continuar** (Chrome) ou **Mostrar detalhes → visitar este site** (Safari).
+- Os IPs de rede local já estão liberados em `allowedDevOrigins` no `next.config.ts`.
+
+## Importar atletas por CSV
+
+Em `/atletas` → **Importar CSV**. O arquivo precisa de cabeçalho com as colunas `nome, idade, sexo, numero`, em qualquer ordem. O separador pode ser vírgula ou ponto e vírgula (padrão do Excel em português).
+
+- Sexo aceita `M`/`F`, `masculino`/`feminino`, `masc`/`fem`.
+- Antes de importar, a tela mostra uma prévia com os erros por linha (número repetido, já cadastrado, idade inválida…). Só as linhas válidas são importadas.
+
+Há um exemplo com 20 atletas em `exemplos/atletas-exemplo.csv`.
+
+## Números de peito (PDF)
+
+O botão **Gerar números de peito (PDF)** cria uma página A5 (paisagem) por atleta, em ordem de número. Cada página tem o número grande, o nome do atleta e um QR Code que contém **apenas o número**.
+
+## Largada
+
+Em `/largada`, o botão **DAR LARGADA** pede confirmação e chama a RPC `start_race`. O `start_time` é gravado com o `now()` do **servidor**, nunca com o relógio do aparelho.
+
+- Clicar de novo (ou em outro aparelho) não altera o horário já gravado.
+- Depois da largada, a tela mostra o cronômetro e as chegadas em tempo real. O cronômetro usa o relógio do aparelho corrigido pela diferença medida em relação ao servidor.
+- **Encerrar corrida** muda o status para `finished`. Uma corrida encerrada não pode ser largada de novo.
+
+Para **reiniciar uma corrida de teste**, rode no SQL Editor (isso apaga as chegadas):
+
+```sql
+delete from finishes where race_id = (select id from races order by created_at desc limit 1);
+update races set status = 'not_started', start_time = null
+ where id = (select id from races order by created_at desc limit 1);
+```
+
+## Chegada
+
+A tela `/chegada` foi pensada para o celular, usado com uma mão.
+
+1. **CHEGOU** registra o horário no instante do toque, mesmo sem saber quem é. A chegada entra na fila de pendentes.
+2. O número digitado no teclado vai para a **pendente mais antiga deste aparelho**. Pendentes de outros aparelhos não são usadas.
+3. Sem pendentes, digitar o número registra a chegada com o horário daquele momento.
+4. A confirmação mostra número, nome, tempo e ritmo, e o celular vibra (a vibração não funciona no iPhone).
+5. Na lista de últimas chegadas:
+   - **Identificar** ou **Corrigir** escolhe a chegada que recebe o próximo número digitado.
+   - **✕** exclui a chegada.
+
+Erros tratados:
+
+- Número não cadastrado. Antes de recusar, a tela recarrega a lista de atletas, caso ele tenha sido cadastrado depois.
+- Atleta que já chegou: a tela avisa e não duplica. O banco também bloqueia, mesmo entre aparelhos diferentes.
+- Relógio sem sincronizar (sem internet ao abrir): usa a última diferença medida neste celular. Se ele nunca sincronizou, a tela avisa e usa o relógio do celular.
+
+Todo `finish_time` é o relógio do celular mais a diferença medida em relação ao servidor. No computador, também dá para usar o teclado físico: dígitos, Backspace e Enter.
+
+### Leitura por QR Code
+
+Na chave **Teclado | Câmera (QR)**, a opção Câmera abre a câmera traseira. Ela lê sem parar, e cada número lido segue as mesmas regras da digitação.
+
+- O mesmo QR é aceito uma vez a cada 4 segundos, para o atleta parado na frente da câmera não gerar várias leituras.
+- Se a câmera ler de novo um peito que este celular acabou de registrar, aparece um aviso neutro ("já registrado"), sem alarme.
+- QR que não contém só o número mostra "QR Code não reconhecido".
+- Erros de câmera têm mensagem própria:
+  - permissão negada;
+  - nenhuma câmera encontrada;
+  - câmera em uso por outro app;
+  - página aberta sem HTTPS.
+- A escolha entre teclado e câmera fica salva no aparelho.
+
+## Modo offline
+
+A tela de chegada continua funcionando sem internet.
+
+- **Tudo é salvo primeiro no celular.** Cada ação (CHEGOU, número associado, correção, exclusão) é gravada numa fila no IndexedDB e só depois enviada ao Supabase, em ordem. A fila sobrevive a fechar a aba ou recarregar a página.
+- **Indicador** na barra do topo:
+  - **Online** (preta): tudo enviado.
+  - **Online/Enviando · X pendentes de envio** (amarela).
+  - **Offline · X pendentes de envio** (vermelha).
+- **Sincronização automática:**
+  - quando a internet volta (evento `online`);
+  - a cada 10 s enquanto houver pendências (cobre o Wi-Fi conectado mas sem internet);
+  - ao abrir a tela.
+- **Sem duplicidade:** a chegada é gravada pelo `client_id` com `ON CONFLICT DO NOTHING`. Reenviar depois de uma queda no meio do envio não cria outra linha.
+- **Conflito entre aparelhos:** se outro aparelho registrou o mesmo atleta enquanto este estava offline, a chegada deste aparelho é gravada **sem número**, e a tela avisa. Ela aparece na classificação para correção, e nenhum horário se perde.
+- **Dados em cache para funcionar sem rede:** a corrida atual, a lista de atletas (os números são reconhecidos offline) e a última diferença medida do relógio (o `finish_time` continua corrigido).
+
+Com o service worker do PWA (build de produção), o app também **abre do zero sem internet**, desde que tenha sido aberto uma vez com internet naquele celular.
+
+## Classificação
+
+A tela `/resultados` atualiza em tempo real. Novas chegadas, números associados e correções de atletas aparecem sozinhos.
+
+- **Classificação:** posição, número, nome, idade, sexo, tempo total (hh:mm:ss) e ritmo (min/km), em ordem de tempo.
+  - Filtros: geral, por sexo ou por categoria.
+  - Com filtro, a posição é dentro do filtro, e a posição geral aparece embaixo.
+- **Premiação:** pódio (top 3) de cada categoria.
+- **Chegadas sem atleta identificado** aparecem numa seção laranja no topo, onde dá para associar o número ou excluir a chegada.
+- **Exportar CSV:** classificação geral completa, com a categoria de cada atleta. Usa separador `;` e UTF-8 com BOM, e abre direto no Excel em português.
+
+Cálculos (funções puras com testes em `lib/*.test.ts`, rode `npm test`):
+
+- tempo_total = `finish_time − start_time`;
+- ritmo = tempo_total ÷ distância, exibido como `m:ss /km`;
+- empate no tempo é desempatado pelo número de peito.
+
+## Telão
+
+`/telao` foi feito para uma TV ou projetor. O botão **Modo telão** em `/resultados` também leva até ele.
+
+- Tela inteira, fundo preto e letras proporcionais à largura da tela.
+- No topo ficam o cronômetro e as **últimas 3 chegadas**. Quem chegou há menos de 20 s fica destacado em amarelo.
+- **Rolagem automática:** pausa de 5 s no topo, desce devagar, pausa de 5 s no fim e volta ao topo.
+- Controles discretos no canto inferior direito:
+  - visão: Classificação, Premiação ou Alternar (troca a cada 40 s);
+  - filtro: Geral, Masculino ou Feminino;
+  - Tela cheia e Sair.
+- A configuração fica na URL, para deixar a TV pronta. Exemplos: `/telao?view=alternar`, `/telao?view=premiacao&sexo=F`.
+
+## Categorias de premiação
+
+Configuradas em `lib/categories.ts`. O padrão é:
+
+- Geral masculino e geral feminino (top 3).
+- Por sexo e faixa etária (top 3): até 19, 20–29, 30–39, 40–49, 50–59 e 60+.
+
+A premiação é **não cumulativa** (`CUMULATIVE_AWARDS = false`): quem sobe ao pódio geral não é premiado também na faixa etária, e a vaga passa para o próximo da faixa. Mude para `true` se a mesma pessoa puder ganhar nas duas.
+
+## PWA e publicação
+
+O app é um PWA instalável:
+
+- `app/manifest.ts`: nome, ícones em `public/icons/`, `display: standalone` e abre direto em `/chegada`.
+- `public/sw.js`: service worker, registrado só no build de produção.
+  - Pré-carrega as telas na instalação.
+  - Arquivos de `/_next/static` vêm do cache primeiro.
+  - Páginas vêm da rede primeiro, com a última versão guardada como reserva sem internet.
+  - Supabase não passa pelo cache: quem cuida disso é a fila offline.
+  - Ao mudar o `sw.js` de forma que exija limpar o cache, aumente o `VERSION`.
+
+Para testar o PWA localmente: `npm run build && npm start` e abra http://localhost:3000. No `npm run dev`, o service worker fica desligado.
+
+**Publicar (recomendado: Vercel)**
+
+A câmera, a instalação e o service worker exigem HTTPS, que a Vercel já fornece.
+
+1. Suba o repositório para o GitHub e importe o projeto em [vercel.com](https://vercel.com).
+2. Em **Settings → Environment Variables**, cadastre `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. **Não** cadastre `DATABASE_URL`.
+3. Faça o deploy e, no celular, abra o endereço e use **Adicionar à tela inicial**.
+
+**Antes do dia da prova:** abra o app instalado uma vez com internet em cada celular de chegada. É isso que guarda as telas, os atletas e o relógio para funcionar offline.
+
+## Testes
+
+- Unitários (Vitest), cobrindo tempo, ritmo, CSV, categorias, classificação, relógio, QR e fila offline: `npx vitest run`, ou `npm test` para o modo que fica observando os arquivos.
+- Ensaio de corrida com 20 atletas, chegadas simultâneas e queda de internet: [docs/roteiro-de-teste.md](docs/roteiro-de-teste.md).
+
+## PIN de administrador (futuro)
+
+Ainda não há autenticação. O ponto de entrada está em `lib/admin.ts`, e as políticas RLS da migração estão comentadas indicando onde restringir a escrita.

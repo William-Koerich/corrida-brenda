@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# exemplo de variáveis pode ser versionado
+!.env.example
+
+# certificados do next dev --experimental-https
+/certificates
