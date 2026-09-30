@@ -1,10 +1,17 @@
 "use client";
 
+import { Flag, Lock, RotateCcw, Square } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useRace } from "@/components/race-provider";
+import { RaceStatusBadge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Alert, Card, CardHeader, PageHeader, Stat } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/dialog";
 import { parseTimestamp } from "@/lib/clock";
 import { friendlyError } from "@/lib/errors";
 import { useServerClock } from "@/lib/server-clock";
 import { getSupabase } from "@/lib/supabase";
+import { elapsedMs, formatDuration } from "@/lib/time";
 import type { Race } from "@/lib/types";
 import { Stopwatch } from "../stopwatch";
 
@@ -38,9 +45,8 @@ function useRaceCounts(raceId: string) {
     // sem filtro: exclusões não passam por filtros do Realtime
     const channel = supabase
       .channel(`finishes-count-${crypto.randomUUID()}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "finishes" }, () => {
-        load();
-      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "finishes" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "athletes" }, () => load())
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
@@ -50,149 +56,176 @@ function useRaceCounts(raceId: string) {
   return counts;
 }
 
-function ConfirmButton({
-  label,
-  question,
-  confirmLabel,
-  onConfirm,
-  className,
-}: {
-  label: string;
-  question: string;
-  confirmLabel: string;
-  onConfirm: () => Promise<void>;
-  className: string;
-}) {
-  const [asking, setAsking] = useState(false);
-  const [busy, setBusy] = useState(false);
+type Action = "start" | "finish" | "reset";
 
-  if (!asking) {
-    return (
-      <button onClick={() => setAsking(true)} className={className}>
-        {label}
-      </button>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-3 rounded-lg border-4 border-black p-4">
-      <p className="text-center text-xl font-bold">{question}</p>
-      <div className="grid grid-cols-2 gap-3">
-        <button
-          onClick={() => setAsking(false)}
-          disabled={busy}
-          className="rounded-lg border-2 border-black py-4 text-lg font-bold"
-        >
-          Cancelar
-        </button>
-        <button
-          onClick={async () => {
-            setBusy(true);
-            await onConfirm();
-            setBusy(false);
-            setAsking(false);
-          }}
-          disabled={busy}
-          className="rounded-lg bg-black py-4 text-lg font-bold text-white disabled:opacity-50"
-        >
-          {busy ? "Aguarde…" : confirmLabel}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-export function StartPanel({ race, onChanged }: { race: Race; onChanged: () => Promise<void> }) {
+export function StartPanel({ race }: { race: Race }) {
+  const { reload } = useRace();
   const counts = useRaceCounts(race.id);
   const clock = useServerClock();
   const [error, setError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<Action | null>(null);
 
-  async function callRpc(fn: "start_race" | "finish_race") {
+  async function run(action: Action) {
     setError(null);
+    const fn = { start: "start_race", finish: "finish_race", reset: "reset_race" }[action];
     const { error } = await getSupabase().rpc(fn, { p_race_id: race.id });
     if (error) setError(friendlyError(error));
-    await onChanged();
+    await reload();
   }
 
   const startMs = race.start_time ? parseTimestamp(race.start_time) : null;
+  const time = (iso: string) => new Date(parseTimestamp(iso)).toLocaleTimeString("pt-BR");
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <p className="text-2xl font-bold">{race.name}</p>
-        <p className="text-lg">
-          {race.distance_km} km · {counts ? `${counts.athletes} atletas cadastrados` : "…"}
-        </p>
-      </div>
+      <PageHeader
+        title="Largada"
+        description={
+          <span className="flex flex-wrap items-center gap-2">
+            {race.name} · {Number(race.distance_km).toLocaleString("pt-BR")} km <RaceStatusBadge status={race.status} />
+          </span>
+        }
+      />
 
-      {race.status === "not_started" && (
-        <ConfirmButton
-          label="DAR LARGADA"
-          question={`Dar a largada da ${race.name} agora?`}
-          confirmLabel="SIM, LARGAR"
-          onConfirm={() => callRpc("start_race")}
-          className="rounded-2xl bg-green-600 py-16 text-4xl font-black text-white shadow-lg active:scale-95"
-        />
-      )}
-
-      {startMs !== null && (
-        <section className="flex flex-col gap-2 rounded-lg bg-black p-6 text-white">
-          {race.status === "running" ? (
-            <p className="text-center">
-              <Stopwatch startMs={startMs} now={clock.now} className="text-6xl font-bold sm:text-8xl" />
-            </p>
-          ) : (
-            <p className="text-center text-4xl font-bold">Corrida encerrada</p>
+      {/* painel principal */}
+      <section className="relative overflow-hidden rounded-3xl bg-ink px-6 py-10 text-center text-white shadow-lg sm:py-14">
+        <div className="pointer-events-none absolute -bottom-32 left-1/2 size-96 -translate-x-1/2 rounded-full bg-volt/15 blur-3xl" />
+        <div className="relative flex flex-col items-center gap-6">
+          {race.status === "not_started" && (
+            <>
+              <p className="max-w-md text-white/70">
+                A largada é gravada com o <strong className="text-white">relógio do servidor</strong>, igual para todos
+                os aparelhos.
+              </p>
+              <button
+                onClick={() => setConfirming("start")}
+                className="flex size-52 flex-col items-center justify-center gap-2 rounded-full bg-volt text-ink shadow-[0_0_0_12px_rgba(198,244,50,0.15)] transition hover:bg-volt-strong active:scale-95 sm:size-60"
+              >
+                <Flag size={40} strokeWidth={2.5} />
+                <span className="text-2xl font-black tracking-tight">DAR LARGADA</span>
+              </button>
+            </>
           )}
-          <p className="text-center">
-            Largada às {new Date(startMs).toLocaleTimeString("pt-BR")} (horário do servidor)
-          </p>
-        </section>
-      )}
+
+          {race.status === "running" && startMs !== null && (
+            <>
+              <p className="text-xs font-medium tracking-widest text-white/50 uppercase">Tempo de prova</p>
+              <Stopwatch startMs={startMs} now={clock.now} className="text-6xl font-semibold text-volt sm:text-8xl" />
+              <p className="text-white/70">Largada às {time(race.start_time!)} · horário do servidor</p>
+            </>
+          )}
+
+          {race.status === "finished" && race.start_time && (
+            <>
+              <span className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-sm font-medium">
+                <Lock size={14} /> Corrida encerrada · chegadas bloqueadas
+              </span>
+              <p className="tabular font-mono text-6xl font-semibold text-white sm:text-8xl">
+                {race.finished_at ? formatDuration(elapsedMs(race.start_time, race.finished_at)) : "—"}
+              </p>
+              <p className="text-white/70">
+                Largada às {time(race.start_time)}
+                {race.finished_at && ` · encerrada às ${time(race.finished_at)}`}
+              </p>
+            </>
+          )}
+        </div>
+      </section>
+
+      {error && <Alert tone="danger">{error}</Alert>}
 
       {race.status !== "not_started" && counts && (
-        <section className="grid grid-cols-2 gap-3 text-center">
-          <div className="rounded-lg border-2 border-black p-4">
-            <p className="text-4xl font-bold tabular-nums">
-              {counts.identified}
-              <span className="text-xl">/{counts.athletes}</span>
-            </p>
-            <p>atletas chegaram</p>
-          </div>
-          <div className="rounded-lg border-2 border-black p-4">
-            <p className="text-4xl font-bold tabular-nums">{counts.finishes - counts.identified}</p>
-            <p>chegadas sem número</p>
-          </div>
-        </section>
+        <div className="grid grid-cols-3 gap-3">
+          <Stat label="Chegaram" value={counts.identified} hint={`de ${counts.athletes} atletas`} />
+          <Stat label="Sem número" value={counts.finishes - counts.identified} />
+          <Stat label="Faltam" value={Math.max(0, counts.athletes - counts.identified)} />
+        </div>
+      )}
+      {race.status === "not_started" && counts && (
+        <div className="grid grid-cols-2 gap-3">
+          <Stat label="Atletas inscritos" value={counts.athletes} />
+          <Stat label="Distância" value={`${Number(race.distance_km).toLocaleString("pt-BR")} km`} />
+        </div>
       )}
 
       {race.status === "running" && (
-        <ConfirmButton
-          label="Encerrar corrida"
-          question="Encerrar a corrida? O cronômetro para nesta tela."
-          confirmLabel="Encerrar"
-          onConfirm={() => callRpc("finish_race")}
-          className="rounded-lg border-2 border-red-700 py-4 text-lg font-bold text-red-700"
-        />
+        <Card>
+          <CardHeader
+            title="Encerrar corrida"
+            description="Depois de encerrada, novas chegadas não são aceitas. Chegadas já registradas ainda podem ser identificadas e corrigidas."
+            action={
+              <Button variant="primary" icon={<Square size={14} />} onClick={() => setConfirming("finish")}>
+                Encerrar
+              </Button>
+            }
+            divider={false}
+          />
+        </Card>
       )}
 
-      {error && <p className="font-bold text-red-700">{error}</p>}
+      {race.status !== "not_started" && (
+        <Card className="ring-red-200">
+          <CardHeader
+            title={<span className="text-red-800">Reiniciar corrida</span>}
+            description="Apaga todas as chegadas e volta para “aguardando largada”. Os atletas cadastrados são mantidos."
+            action={
+              <Button variant="danger-outline" icon={<RotateCcw size={14} />} onClick={() => setConfirming("reset")}>
+                Reiniciar
+              </Button>
+            }
+            divider={false}
+          />
+        </Card>
+      )}
 
-      <p className="text-sm text-black/60">
+      <p className="text-center text-xs text-ink-soft">
         {clock.state.status === "syncing" && "Sincronizando relógio com o servidor…"}
         {clock.state.status === "synced" &&
-          `Relógio sincronizado (diferença ${(clock.state.offset.offsetMs / 1000).toFixed(1)} s, precisão ±${Math.round(
+          `Relógio sincronizado · diferença ${(clock.state.offset.offsetMs / 1000).toFixed(1)} s · precisão ±${Math.round(
             clock.state.offset.rttMs / 2,
-          )} ms)`}
+          )} ms`}
         {clock.state.status === "error" && (
           <>
             Relógio não sincronizado: {clock.state.message}{" "}
-            <button onClick={clock.sync} className="underline">
+            <button onClick={clock.sync} className="font-semibold underline">
               Tentar de novo
             </button>
           </>
         )}
       </p>
+
+      <ConfirmDialog
+        open={confirming === "start"}
+        onClose={() => setConfirming(null)}
+        onConfirm={() => run("start")}
+        tone="accent"
+        title={`Dar a largada da ${race.name}?`}
+        description="O cronômetro começa agora em todos os aparelhos."
+        confirmLabel="Sim, largar"
+      />
+      <ConfirmDialog
+        open={confirming === "finish"}
+        onClose={() => setConfirming(null)}
+        onConfirm={() => run("finish")}
+        title="Encerrar a corrida?"
+        description="Novas chegadas passam a ser recusadas em todos os aparelhos. Chegadas registradas antes do encerramento em celulares offline ainda serão aceitas quando sincronizarem."
+        confirmLabel="Encerrar corrida"
+      />
+      <ConfirmDialog
+        open={confirming === "reset"}
+        onClose={() => setConfirming(null)}
+        onConfirm={() => run("reset")}
+        tone="danger"
+        title="Reiniciar a corrida?"
+        description={
+          <>
+            Todas as <strong>{counts?.finishes ?? 0} chegadas</strong> serão apagadas e a corrida volta para “aguardando
+            largada”. Os atletas continuam cadastrados. Esta ação não pode ser desfeita.
+          </>
+        }
+        confirmLabel="Reiniciar corrida"
+        confirmText="REINICIAR"
+      />
     </div>
   );
 }

@@ -24,12 +24,9 @@ Material: os 20 números de peito impressos (ou abertos em outro celular/tablet)
 ## Preparação (na véspera)
 
 1. **App publicado com HTTPS.** Pode ser a Vercel (veja o README) ou `npm run dev:https` na rede local.
-2. **Zerar a corrida.** No SQL Editor do Supabase:
+2. **Zerar a corrida.** Em `/largada` → **Reiniciar** → digitar `REINICIAR`. Isso apaga as chegadas e mantém os atletas. Para começar também sem atletas, rode no SQL Editor:
    ```sql
    delete from athletes where race_id = (select id from races order by created_at desc limit 1);
-   delete from finishes where race_id = (select id from races order by created_at desc limit 1);
-   update races set status = 'not_started', start_time = null
-    where id = (select id from races order by created_at desc limit 1);
    ```
 3. **Cadastrar os atletas.** Em `/atletas` → **Importar CSV** → `exemplos/atletas-exemplo.csv`. A prévia deve mostrar "20 válidos".
 4. **Números de peito.** Clique em **Gerar números de peito (PDF)** e imprima, ou deixe o PDF aberto num tablet.
@@ -124,7 +121,9 @@ Os tempos são aproximados: o importante é a **ordem** das ondas. "Simultâneo"
 | ✅ | Passo | Resultado esperado |
 | -- | ----- | ------------------ |
 | ☐ | Nº **17**, **19** e **20** chegam. Celular B registra pela câmera | Confirmações verdes |
-| ☐ | Coordenador: `/largada` → **Encerrar corrida** | O cronômetro para e aparece "Corrida encerrada" |
+| ☐ | Coordenador: `/largada` → **Encerrar** → **Encerrar corrida** | Aparece "Corrida encerrada · chegadas bloqueadas" |
+| ☐ | Olhar os celulares A e B | O botão CHEGOU some sozinho e aparece "Corrida encerrada" |
+| ☐ | Celular A: em Últimas chegadas, **Corrigir** numa chegada qualquer e cancelar | O teclado só aparece para corrigir ou identificar. Não há como registrar chegada nova |
 
 ## Conferência final
 
@@ -132,8 +131,8 @@ Os tempos são aproximados: o importante é a **ordem** das ondas. "Simultâneo"
 | -- | ---- | ------------------ |
 | ☐ | `/largada` | "20/20 atletas chegaram" e "0 chegadas sem número" |
 | ☐ | `/resultados` → Classificação | 20 classificados, sem quadro laranja, ordem coerente com o cronograma |
-| ☐ | Filtros Masculino, Feminino e uma faixa (ex.: 40–49 F) | Posições recalculadas, com a posição geral embaixo |
-| ☐ | Aba Premiação | Pódios preenchidos. Quem está no geral **não** aparece de novo na faixa etária |
+| ☐ | Filtros Masculino e Feminino | Posições recalculadas, com a posição geral embaixo |
+| ☐ | Aba Premiação | Dois pódios: geral masculino e geral feminino, com 1º, 2º e 3º |
 | ☐ | **Exportar CSV** e abrir no Excel | 21 linhas (cabeçalho + 20), acentos corretos, colunas separadas |
 | ☐ | Telão em **Alternar** | Troca entre classificação e premiação a cada 40 s, e rola sozinho |
 
@@ -172,4 +171,4 @@ Se algo falhar, anote a onda, o aparelho, a hora e o que apareceu na tela. Se de
 
 ## Depois do ensaio
 
-Zere a corrida com o SQL da preparação (passo 2). Se quiser manter os atletas, apague só as chegadas e a largada, sem a primeira linha.
+Em `/largada` → **Reiniciar** (digite `REINICIAR`). As chegadas são apagadas e os atletas continuam cadastrados para o dia da prova.

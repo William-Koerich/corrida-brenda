@@ -1,8 +1,10 @@
 "use client";
 
+import { Delete } from "lucide-react";
 import { useEffect } from "react";
 
 const MAX_DIGITS = 5;
+const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "⌫", "0", "OK"];
 
 interface Props {
   value: string;
@@ -36,27 +38,28 @@ export function Keypad({ value, onChange, onSubmit, disabled }: Props) {
   return (
     <div className="flex flex-col gap-2">
       <div
-        className="flex h-16 items-center justify-center rounded-lg border-4 border-black bg-white text-6xl font-black tabular-nums"
+        className="tabular flex h-16 items-center justify-center rounded-2xl bg-white font-mono text-5xl font-semibold ring-2 ring-ink"
         aria-live="polite"
       >
-        {value || <span className="text-3xl font-bold text-black/30">Nº do peito</span>}
+        {value || <span className="font-sans text-2xl font-medium text-ink-soft/50">Nº do peito</span>}
       </div>
       <div className="grid grid-cols-3 gap-2">
-        {["1", "2", "3", "4", "5", "6", "7", "8", "9", "⌫", "0", "OK"].map((key) => (
+        {KEYS.map((key) => (
           <button
             key={key}
             type="button"
             onClick={() => press(key)}
             disabled={disabled || (key === "OK" && !value)}
-            className={`h-14 rounded-lg text-3xl font-black active:scale-95 disabled:opacity-40 ${
+            aria-label={key === "⌫" ? "Apagar" : key}
+            className={`flex h-14 items-center justify-center rounded-2xl text-3xl font-semibold transition select-none active:scale-95 disabled:opacity-30 ${
               key === "OK"
-                ? "bg-green-600 text-white"
+                ? "bg-emerald-600 text-white"
                 : key === "⌫"
-                  ? "bg-black/10"
-                  : "border-2 border-black bg-white"
+                  ? "bg-black/5 text-ink"
+                  : "bg-white text-ink shadow-sm ring-1 ring-line"
             }`}
           >
-            {key}
+            {key === "⌫" ? <Delete size={26} /> : key}
           </button>
         ))}
       </div>

@@ -1,8 +1,12 @@
 "use client";
 
+import { Trash2, TriangleAlert } from "lucide-react";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/field";
 import { resolveBib } from "@/lib/finish-logic";
-import { formatDuration, elapsedMs } from "@/lib/time";
+import { elapsedMs, formatDuration } from "@/lib/time";
 import type { Athlete, Finish } from "@/lib/types";
 
 interface Props {
@@ -16,39 +20,53 @@ interface Props {
 
 /** Chegadas sem atleta: associar um número ou excluir. */
 export function UnidentifiedList({ unidentified, allFinishes, athletesByBib, startTime, onAssign, onDelete }: Props) {
+  const [deleting, setDeleting] = useState<Finish | null>(null);
   if (!unidentified.length) return null;
 
   return (
-    <section className="flex flex-col gap-2 rounded-lg border-4 border-orange-500 bg-orange-50 p-3">
-      <h2 className="text-xl font-bold text-orange-800">
-        {unidentified.length} {unidentified.length === 1 ? "chegada sem atleta identificado" : "chegadas sem atleta identificado"}
-      </h2>
+    <section className="rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-300 sm:p-5">
+      <div className="mb-3 flex items-center gap-2 text-amber-900">
+        <TriangleAlert size={18} />
+        <h2 className="font-semibold">
+          {unidentified.length}{" "}
+          {unidentified.length === 1 ? "chegada sem atleta identificado" : "chegadas sem atleta identificado"}
+        </h2>
+      </div>
       <ul className="flex flex-col gap-2">
-        {unidentified.map((f) => (
-          <UnidentifiedRow
-            key={f.client_id}
-            finish={f}
-            time={formatDuration(elapsedMs(startTime, f.finish_time))}
-            resolve={(bib) => resolveBib(bib, athletesByBib, allFinishes, f)}
-            onAssign={(athlete) => onAssign(f.client_id, athlete)}
-            onDelete={() => {
-              if (window.confirm("Excluir esta chegada sem número?")) onDelete(f.client_id);
-            }}
-          />
-        ))}
+        {unidentified.map((f) => {
+          const time = formatDuration(elapsedMs(startTime, f.finish_time));
+          return (
+            <UnidentifiedRow
+              key={f.client_id}
+              time={time}
+              resolve={(bib) => resolveBib(bib, athletesByBib, allFinishes, f)}
+              onAssign={(athlete) => onAssign(f.client_id, athlete)}
+              onDelete={() => setDeleting(f)}
+            />
+          );
+        })}
       </ul>
+      <ConfirmDialog
+        open={deleting !== null}
+        onClose={() => setDeleting(null)}
+        onConfirm={() => {
+          if (deleting) onDelete(deleting.client_id);
+        }}
+        tone="danger"
+        title="Excluir esta chegada sem número?"
+        description={deleting ? `Chegada de ${formatDuration(elapsedMs(startTime, deleting.finish_time))}.` : undefined}
+        confirmLabel="Excluir chegada"
+      />
     </section>
   );
 }
 
 function UnidentifiedRow({
-  finish,
   time,
   resolve,
   onAssign,
   onDelete,
 }: {
-  finish: Finish;
   time: string;
   resolve: (bib: number) => ReturnType<typeof resolveBib>;
   onAssign: (athlete: Athlete) => void;
@@ -71,30 +89,31 @@ function UnidentifiedRow({
   }
 
   return (
-    <li className="flex flex-col gap-1 rounded-lg bg-white p-2" data-client-id={finish.client_id}>
+    <li className="rounded-xl bg-white p-2 ring-1 ring-amber-200">
       <form onSubmit={submit} className="flex items-center gap-2">
-        <span className="w-24 shrink-0 font-mono text-lg font-bold tabular-nums">{time}</span>
-        <input
+        <span className="tabular w-22 shrink-0 pl-1 font-mono font-semibold">{time}</span>
+        <Input
           value={value}
           onChange={(e) => setValue(e.target.value.replace(/\D/g, ""))}
           inputMode="numeric"
           placeholder="Nº"
           aria-label={`Número para a chegada de ${time}`}
-          className="w-20 min-w-0 flex-1 rounded-lg border-2 border-black px-2 py-2 text-lg font-bold"
+          className="h-10 min-w-0 flex-1"
         />
-        <button type="submit" className="rounded-lg bg-black px-3 py-2 font-bold text-white">
+        <Button type="submit" variant="primary" size="sm" className="h-10">
           Associar
-        </button>
-        <button
-          type="button"
-          onClick={onDelete}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           aria-label="Excluir chegada"
-          className="rounded-lg border-2 border-red-700 px-3 py-2 font-bold text-red-700"
+          className="h-10 text-red-700 hover:bg-red-50"
+          onClick={onDelete}
         >
-          ✕
-        </button>
+          <Trash2 size={16} />
+        </Button>
       </form>
-      {error && <p className="text-sm font-bold text-red-700">{error}</p>}
+      {error && <p className="mt-1 px-1 text-sm font-medium text-red-700">{error}</p>}
     </li>
   );
 }

@@ -15,6 +15,12 @@ describe("isNetworkError", () => {
 });
 
 describe("friendlyError", () => {
+  it("chegada fora da janela da corrida", () => {
+    expect(friendlyError({ code: "P0001", message: "fora_da_corrida:encerrada" })).toMatch(/encerrada/);
+    expect(friendlyError({ code: "P0001", message: "fora_da_corrida:nao_largou" })).toMatch(/descartada/);
+    expect(isNetworkError({ code: "P0001", message: "fora_da_corrida:encerrada" })).toBe(false);
+  });
+
   it("traduz duplicidades conhecidas", () => {
     expect(friendlyError({ code: "23505", message: 'violates unique constraint "athletes_race_bib_unique"' })).toBe(
       "Este número de peito já está cadastrado.",

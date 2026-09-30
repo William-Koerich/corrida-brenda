@@ -1,12 +1,4 @@
-import {
-  ageBandFor,
-  CATEGORIES,
-  CUMULATIVE_AWARDS,
-  PODIUM_SIZE,
-  SEX_LABEL,
-  type AgeBand,
-  type Category,
-} from "./categories";
+import { CATEGORIES, PODIUM_SIZE, SEX_LABEL, type Category } from "./categories";
 import { elapsedMs, formatDuration, formatPace } from "./time";
 import type { Athlete, Finish, Race, Sex } from "./types";
 
@@ -16,7 +8,6 @@ export interface ResultRow {
   athlete: Athlete;
   finish: Finish;
   elapsedMs: number;
-  band: AgeBand | undefined;
 }
 
 export interface RaceResults {
@@ -41,12 +32,7 @@ export function buildResults(
       unidentified.push(finish);
       continue;
     }
-    rows.push({
-      athlete,
-      finish,
-      elapsedMs: elapsedMs(race.start_time, finish.finish_time),
-      band: ageBandFor(athlete.age),
-    });
+    rows.push({ athlete, finish, elapsedMs: elapsedMs(race.start_time, finish.finish_time) });
   }
 
   rows.sort((a, b) => a.elapsedMs - b.elapsedMs || a.athlete.bib_number - b.athlete.bib_number);
@@ -54,26 +40,12 @@ export function buildResults(
   return { rows: rows.map((r, i) => ({ ...r, overall: i + 1 })), unidentified };
 }
 
-export type ResultFilter =
-  | { kind: "all" }
-  | { kind: "sex"; sex: Sex }
-  | { kind: "category"; categoryId: string };
-
-export function inCategory(row: ResultRow, category: Category): boolean {
-  return row.athlete.sex === category.sex && (!category.band || row.band?.id === category.band.id);
-}
+/** "all" = geral (todos); M/F = só aquele sexo. */
+export type SexFilter = "all" | Sex;
 
 /** Linhas do filtro, com a posição recalculada dentro dele. */
-export function filterResults(
-  rows: ResultRow[],
-  filter: ResultFilter,
-): (ResultRow & { position: number })[] {
-  let list = rows;
-  if (filter.kind === "sex") list = rows.filter((r) => r.athlete.sex === filter.sex);
-  if (filter.kind === "category") {
-    const category = CATEGORIES.find((c) => c.id === filter.categoryId);
-    list = category ? rows.filter((r) => inCategory(r, category)) : [];
-  }
+export function filterResults(rows: ResultRow[], filter: SexFilter): (ResultRow & { position: number })[] {
+  const list = filter === "all" ? rows : rows.filter((r) => r.athlete.sex === filter);
   return list.map((r, i) => ({ ...r, position: i + 1 }));
 }
 
@@ -82,50 +54,34 @@ export interface Podium {
   winners: ResultRow[];
 }
 
-/**
- * Pódio de cada categoria. Categorias gerais primeiro; sem premiação
- * cumulativa, quem está no pódio geral é pulado nas faixas etárias.
- */
-export function podiums(
-  rows: ResultRow[],
-  options: { size?: number; cumulative?: boolean } = {},
-): Podium[] {
-  const size = options.size ?? PODIUM_SIZE;
-  const cumulative = options.cumulative ?? CUMULATIVE_AWARDS;
-
-  const general = CATEGORIES.filter((c) => !c.band).map((category) => ({
+/** Pódio geral masculino e geral feminino. */
+export function podiums(rows: ResultRow[], size = PODIUM_SIZE): Podium[] {
+  return CATEGORIES.map((category) => ({
     category,
-    winners: rows.filter((r) => inCategory(r, category)).slice(0, size),
+    winners: rows.filter((r) => r.athlete.sex === category.sex).slice(0, size),
   }));
-  const awarded = new Set(general.flatMap((p) => p.winners.map((w) => w.athlete.id)));
-
-  const byAge = CATEGORIES.filter((c) => c.band).map((category) => ({
-    category,
-    winners: rows
-      .filter((r) => inCategory(r, category) && (cumulative || !awarded.has(r.athlete.id)))
-      .slice(0, size),
-  }));
-
-  return [...general, ...byAge];
 }
 
 /** CSV para Excel em português: separador ";" e BOM UTF-8. */
 export function resultsToCsv(rows: ResultRow[], distanceKm: number): string {
-  const header = ["Posição", "Número", "Nome", "Idade", "Sexo", "Categoria", "Tempo", "Ritmo (min/km)"];
-  const lines = rows.map((r) =>
-    [
+  const header = ["Posição", "Posição no sexo", "Número", "Nome", "Idade", "Sexo", "Tempo", "Ritmo (min/km)"];
+  const bySex = new Map<Sex, number>();
+  const lines = rows.map((r) => {
+    const sexPosition = (bySex.get(r.athlete.sex) ?? 0) + 1;
+    bySex.set(r.athlete.sex, sexPosition);
+    return [
       r.overall,
+      sexPosition,
       r.athlete.bib_number,
       r.athlete.name,
       r.athlete.age,
       SEX_LABEL[r.athlete.sex],
-      r.band ? `${r.band.label} ${SEX_LABEL[r.athlete.sex]}` : "",
       formatDuration(r.elapsedMs),
       formatPace(r.elapsedMs, distanceKm).replace(" /km", ""),
     ]
       .map(csvCell)
-      .join(";"),
-  );
+      .join(";");
+  });
   return "﻿" + [header.join(";"), ...lines].join("\r\n") + "\r\n";
 }
 

@@ -1,26 +1,33 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Paleta do produto */
+@theme {
+  --color-ink: #0b0d10; /* texto e superfícies escuras */
+  --color-ink-soft: #4b5563; /* texto secundário */
+  --color-canvas: #f3f4f6; /* fundo do app */
+  --color-line: #e5e7eb; /* bordas */
+  --color-volt: #c6f432; /* destaque da marca (verde-limão) */
+  --color-volt-strong: #a8d61a;
+  --color-volt-soft: #f1fcd0;
+}
+
+:root {
+  /* o app é sempre claro: legível no sol e igual em qualquer celular */
+  color-scheme: light;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* números alinhados em tempos e classificações */
+.tabular {
+  font-variant-numeric: tabular-nums;
 }

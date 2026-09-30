@@ -1,6 +1,8 @@
-# Cronometragem — Corrida 3 km
+# Linha de Chegada
 
-Aplicação web (PWA, mobile-first) para cronometrar uma corrida de rua de 3 km com premiação por categoria.
+Aplicação web (PWA, mobile-first) para cronometrar corridas de rua, com classificação ao vivo e premiação geral masculina e feminina.
+
+"Linha de Chegada" é um nome provisório. Para renomear o produto inteiro (cabeçalho, telão, manifesto do PWA, título das páginas), edite `lib/brand.ts`.
 
 **Stack:** Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · Supabase (Postgres + Realtime)
 
@@ -109,15 +111,12 @@ Em `/largada`, o botão **DAR LARGADA** pede confirmação e chama a RPC `start_
 
 - Clicar de novo (ou em outro aparelho) não altera o horário já gravado.
 - Depois da largada, a tela mostra o cronômetro e as chegadas em tempo real. O cronômetro usa o relógio do aparelho corrigido pela diferença medida em relação ao servidor.
-- **Encerrar corrida** muda o status para `finished`. Uma corrida encerrada não pode ser largada de novo.
-
-Para **reiniciar uma corrida de teste**, rode no SQL Editor (isso apaga as chegadas):
-
-```sql
-delete from finishes where race_id = (select id from races order by created_at desc limit 1);
-update races set status = 'not_started', start_time = null
- where id = (select id from races order by created_at desc limit 1);
-```
+- **Encerrar** grava o horário de encerramento do servidor (`finished_at`). A partir daí:
+  - a tela de chegada esconde o botão CHEGOU em todos os aparelhos;
+  - o **banco recusa** chegadas com horário depois do encerramento (trigger `check_finish_window`);
+  - um celular que estava offline ainda consegue enviar o que registrou **antes** do encerramento;
+  - identificar e corrigir chegadas que já existem continua liberado, para fechar o resultado.
+- **Reiniciar** (RPC `reset_race`) apaga todas as chegadas e volta para "aguardando largada", mantendo os atletas. Pede para digitar `REINICIAR` antes de confirmar. Chegadas antigas que ainda estiverem na fila de algum celular são recusadas pelo banco, porque são de antes da nova largada.
 
 ## Chegada
 
@@ -177,11 +176,11 @@ Com o service worker do PWA (build de produção), o app também **abre do zero 
 A tela `/resultados` atualiza em tempo real. Novas chegadas, números associados e correções de atletas aparecem sozinhos.
 
 - **Classificação:** posição, número, nome, idade, sexo, tempo total (hh:mm:ss) e ritmo (min/km), em ordem de tempo.
-  - Filtros: geral, por sexo ou por categoria.
+  - Filtros: Geral, Masculino e Feminino.
   - Com filtro, a posição é dentro do filtro, e a posição geral aparece embaixo.
-- **Premiação:** pódio (top 3) de cada categoria.
+- **Premiação:** pódio visual (top 3) geral masculino e geral feminino.
 - **Chegadas sem atleta identificado** aparecem numa seção laranja no topo, onde dá para associar o número ou excluir a chegada.
-- **Exportar CSV:** classificação geral completa, com a categoria de cada atleta. Usa separador `;` e UTF-8 com BOM, e abre direto no Excel em português.
+- **Exportar CSV:** classificação geral completa, com a posição geral e a posição dentro do sexo. Usa separador `;` e UTF-8 com BOM, e abre direto no Excel em português.
 
 Cálculos (funções puras com testes em `lib/*.test.ts`, rode `npm test`):
 
@@ -206,10 +205,15 @@ Cálculos (funções puras com testes em `lib/*.test.ts`, rode `npm test`):
 
 Configuradas em `lib/categories.ts`. O padrão é:
 
-- Geral masculino e geral feminino (top 3).
-- Por sexo e faixa etária (top 3): até 19, 20–29, 30–39, 40–49, 50–59 e 60+.
+- Geral masculino e geral feminino, top 3 (`PODIUM_SIZE`).
 
-A premiação é **não cumulativa** (`CUMULATIVE_AWARDS = false`): quem sobe ao pódio geral não é premiado também na faixa etária, e a vaga passa para o próximo da faixa. Mude para `true` se a mesma pessoa puder ganhar nas duas.
+## Visual
+
+- Componentes em `components/ui/`: botão, cartão, selo de status, abas, campos e caixa de confirmação.
+- Paleta em `app/globals.css` (`ink`, `canvas`, `volt`…). O destaque verde-limão (`volt`) é usado no CHEGOU, no cronômetro e no telão.
+- O app é sempre claro (`color-scheme: light`), para ficar legível no sol e igual em qualquer celular. O telão é escuro.
+- No celular, a navegação fica em abas embaixo. No computador, fica no cabeçalho.
+- `/chegada` é modo foco, sem menus. `/telao` é tela inteira.
 
 ## PWA e publicação
 
@@ -237,7 +241,7 @@ A câmera, a instalação e o service worker exigem HTTPS, que a Vercel já forn
 
 ## Testes
 
-- Unitários (Vitest), cobrindo tempo, ritmo, CSV, categorias, classificação, relógio, QR e fila offline: `npx vitest run`, ou `npm test` para o modo que fica observando os arquivos.
+- Unitários (Vitest), cobrindo tempo, ritmo, CSV, classificação, pódios, relógio, QR e fila offline: `npx vitest run`, ou `npm test` para o modo que fica observando os arquivos.
 - Ensaio de corrida com 20 atletas, chegadas simultâneas e queda de internet: [docs/roteiro-de-teste.md](docs/roteiro-de-teste.md).
 
 ## PIN de administrador (futuro)

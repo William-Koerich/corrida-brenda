@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { NavBar } from "./nav-bar";
+import { AppShell } from "@/components/app-shell";
+import { RaceProvider } from "@/components/race-provider";
+import { BRAND } from "@/lib/brand";
 import { ServiceWorkerRegister } from "./sw-register";
 import "./globals.css";
 
@@ -15,30 +17,27 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Cronometragem 3 km",
-  description: "Cronometragem e classificação da corrida de 3 km",
-  applicationName: "Corrida 3 km",
-  appleWebApp: { capable: true, title: "Corrida 3 km", statusBarStyle: "black" },
+  title: { default: BRAND.name, template: `%s · ${BRAND.name}` },
+  description: BRAND.tagline,
+  applicationName: BRAND.name,
+  appleWebApp: { capable: true, title: BRAND.name, statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#000000",
+  viewportFit: "cover",
+  themeColor: "#0b0d10",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html
-      lang="pt-BR"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">
+    <html lang="pt-BR" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+      <body className="min-h-full font-sans">
         <ServiceWorkerRegister />
-        <NavBar />
-        <main className="flex flex-1 flex-col w-full max-w-3xl mx-auto px-4 py-4">
-          {children}
-        </main>
+        <RaceProvider>
+          <AppShell>{children}</AppShell>
+        </RaceProvider>
       </body>
     </html>
   );

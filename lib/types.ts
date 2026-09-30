@@ -6,6 +6,7 @@ export interface Race {
   name: string;
   distance_km: number;
   start_time: string | null;
+  finished_at: string | null;
   status: RaceStatus;
   created_at: string;
 }

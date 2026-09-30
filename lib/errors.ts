@@ -29,6 +29,12 @@ export function friendlyError(error: unknown): string {
     return "Registro duplicado.";
   }
   if (e.code === "23514") return "Dados inválidos.";
+  if (message.includes("fora_da_corrida:encerrada")) {
+    return "A corrida já foi encerrada. Chegadas depois do encerramento não são aceitas.";
+  }
+  if (message.includes("fora_da_corrida")) {
+    return "Chegada fora do horário da corrida (antes da largada ou de uma corrida reiniciada). Foi descartada.";
+  }
   if (/failed to fetch|network|load failed/i.test(message)) {
     return "Não foi possível conectar ao servidor. Verifique a internet.";
   }

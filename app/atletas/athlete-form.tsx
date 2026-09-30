@@ -1,6 +1,11 @@
 "use client";
 
+import { UserPlus } from "lucide-react";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader } from "@/components/ui/card";
+import { Field, Input } from "@/components/ui/field";
+import { Segmented } from "@/components/ui/segmented";
 import { validateAthlete, type AthleteInput } from "@/lib/athletes";
 import type { Athlete, Sex } from "@/lib/types";
 
@@ -46,74 +51,54 @@ export function AthleteForm({ editing, isBibTaken, onSubmit, onCancel }: Props) 
     }
   }
 
-  const input = "w-full rounded-lg border-2 border-black px-3 py-3 text-lg";
-
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="flex flex-col gap-3 rounded-lg border-2 border-black p-4"
-    >
-      <h2 className="text-xl font-bold">
-        {editing ? `Editar nº ${editing.bib_number}` : "Novo atleta"}
-      </h2>
+    <Card>
+      <CardHeader
+        title={editing ? `Editar atleta nº ${editing.bib_number}` : "Novo atleta"}
+        description={editing ? editing.name : "Todos os campos são obrigatórios."}
+      />
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-5">
+        <Field label="Nome">
+          <Input value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" placeholder="Nome completo" />
+        </Field>
 
-      <label className="flex flex-col gap-1">
-        <span className="font-bold">Nome</span>
-        <input className={input} value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" />
-      </label>
-
-      <div className="grid grid-cols-2 gap-3">
-        <label className="flex flex-col gap-1">
-          <span className="font-bold">Idade</span>
-          <input className={input} value={age} onChange={(e) => setAge(e.target.value)} inputMode="numeric" />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="font-bold">Número de peito</span>
-          <input className={input} value={bib} onChange={(e) => setBib(e.target.value)} inputMode="numeric" />
-        </label>
-      </div>
-
-      <fieldset className="flex flex-col gap-1">
-        <legend className="font-bold mb-1">Sexo</legend>
         <div className="grid grid-cols-2 gap-3">
-          {(["M", "F"] as Sex[]).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setSex(s)}
-              aria-pressed={sex === s}
-              className={`rounded-lg border-2 border-black py-3 text-lg font-bold ${
-                sex === s ? "bg-black text-white" : ""
-              }`}
-            >
-              {s === "M" ? "Masculino" : "Feminino"}
-            </button>
-          ))}
+          <Field label="Idade">
+            <Input value={age} onChange={(e) => setAge(e.target.value)} inputMode="numeric" placeholder="Ex.: 32" />
+          </Field>
+          <Field label="Número de peito">
+            <Input value={bib} onChange={(e) => setBib(e.target.value)} inputMode="numeric" placeholder="Ex.: 101" />
+          </Field>
         </div>
-      </fieldset>
 
-      {errors.length > 0 && (
-        <ul className="rounded-lg bg-red-100 p-3 font-bold text-red-800">
-          {errors.map((err) => (
-            <li key={err}>{err}</li>
-          ))}
-        </ul>
-      )}
+        <div className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium">Sexo</span>
+          <Segmented<Sex | "">
+            ariaLabel="Sexo"
+            value={sex}
+            onChange={setSex}
+            options={[
+              { value: "M", label: "Masculino" },
+              { value: "F", label: "Feminino" },
+            ]}
+          />
+        </div>
 
-      <div className="flex gap-3">
-        <button
-          type="submit"
-          disabled={saving}
-          className="flex-1 rounded-lg bg-black py-3 text-lg font-bold text-white disabled:opacity-50"
-        >
-          {saving ? "Salvando…" : editing ? "Salvar alterações" : "Cadastrar"}
-        </button>
-        {editing && (
-          <button type="button" onClick={onCancel} className="rounded-lg border-2 border-black px-4 font-bold">
-            Cancelar
-          </button>
+        {errors.length > 0 && (
+          <ul className="rounded-xl bg-red-50 p-3 text-sm font-medium text-red-800 ring-1 ring-red-200">
+            {errors.map((err) => (
+              <li key={err}>{err}</li>
+            ))}
+          </ul>
         )}
-      </div>
-    </form>
+
+        <div className="flex gap-2">
+          <Button type="submit" variant="primary" disabled={saving} className="flex-1" icon={!editing && <UserPlus size={16} />}>
+            {saving ? "Salvando…" : editing ? "Salvar alterações" : "Cadastrar"}
+          </Button>
+          {editing && <Button onClick={onCancel}>Cancelar</Button>}
+        </div>
+      </form>
+    </Card>
   );
 }

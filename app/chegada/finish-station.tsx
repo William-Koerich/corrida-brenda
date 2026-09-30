@@ -1,6 +1,11 @@
 "use client";
 
+import { Camera, CheckCircle2, ChevronLeft, Keyboard, Lock, TriangleAlert } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Alert } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/dialog";
+import { Segmented } from "@/components/ui/segmented";
 import { parseTimestamp } from "@/lib/clock";
 import { getDeviceId } from "@/lib/device";
 import { pendingFinishes, resolveBib } from "@/lib/finish-logic";
@@ -8,9 +13,9 @@ import { newFinish } from "@/lib/finishes";
 import { useServerClock } from "@/lib/server-clock";
 import { elapsedMs, formatDuration, formatPace } from "@/lib/time";
 import type { Athlete, Finish, Race } from "@/lib/types";
+import { useAthletes, useFinishes } from "@/lib/use-race-data";
 import { Stopwatch } from "../stopwatch";
 import { SyncBar } from "../sync-indicator";
-import { useAthletes, useFinishes } from "@/lib/use-race-data";
 import { Keypad } from "./keypad";
 import { QrScanner } from "./qr-scanner";
 import { RecentList } from "./recent-list";
@@ -71,6 +76,7 @@ export function FinishStation({ race }: { race: Race }) {
   const { finishes, loadError, status: syncStatus, add, assign, remove } = useFinishes(race.id, showError);
   const [input, setInput] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<Finish | null>(null);
   const [mode, setMode] = useInputMode();
 
   const athletesById = useMemo(
@@ -90,7 +96,10 @@ export function FinishStation({ race }: { race: Race }) {
   }, [feedback]);
 
   const started = race.status !== "not_started" && race.start_time !== null;
+  const finished = race.status === "finished";
   const startMs = race.start_time ? parseTimestamp(race.start_time) : null;
+  // encerrada: só dá para identificar/corrigir chegadas que já existem
+  const canEnterNumber = started && (!finished || target !== undefined);
 
   function describe(finishTime: string) {
     if (!race.start_time) return { time: "--:--:--", pace: "" };
@@ -99,6 +108,7 @@ export function FinishStation({ race }: { race: Race }) {
   }
 
   function handleChegou() {
+    if (finished) return;
     const f = newFinish(race.id, clock.now(), null, deviceId);
     add(f);
     vibrate(60);
@@ -135,10 +145,7 @@ export function FinishStation({ race }: { race: Race }) {
           setFeedback({ kind: "info", title: `Nº ${bib} já registrado`, detail: `${result.athlete.name} · ${time}` });
           return;
         }
-        showError(
-          `Nº ${bib} já chegou`,
-          `${result.athlete.name} · ${time}. A chegada não foi duplicada.`,
-        );
+        showError(`Nº ${bib} já chegou`, `${result.athlete.name} · ${time}. A chegada não foi duplicada.`);
         return;
       }
       case "assign":
@@ -148,6 +155,10 @@ export function FinishStation({ race }: { race: Race }) {
         setFeedback({ kind: "ok", athlete: result.athlete, ...describe(result.target.finish_time) });
         return;
       case "create": {
+        if (finished) {
+          showError("Corrida encerrada", "Novas chegadas não são aceitas. Só dá para identificar as já registradas.");
+          return;
+        }
         const f = newFinish(race.id, clock.now(), result.athlete.id, deviceId);
         add(f);
         vibrate(VIBRATE_OK);
@@ -157,44 +168,60 @@ export function FinishStation({ race }: { race: Race }) {
     }
   }
 
-  function handleDelete(f: Finish) {
-    const athlete = f.athlete_id ? athletesById.get(f.athlete_id) : undefined;
-    const label = athlete ? `nº ${athlete.bib_number} — ${athlete.name}` : "sem número";
-    if (!window.confirm(`Excluir a chegada ${label} (${describe(f.finish_time).time})?`)) return;
-    remove(f.client_id);
-    if (selectedId === f.client_id) setSelectedId(null);
-  }
+  const deletingAthlete = deleting?.athlete_id ? athletesById.get(deleting.athlete_id) : undefined;
 
   return (
     <div className="flex flex-col gap-3">
-      {/* conexão + cronômetro */}
-      <SyncBar status={syncStatus}>
-        {started && startMs !== null && race.status === "running" ? (
-          <Stopwatch startMs={startMs} now={clock.now} className="shrink-0 text-2xl font-bold" />
-        ) : (
-          <span className="shrink-0 font-bold">{race.status === "finished" ? "Encerrada" : "Aguardando largada"}</span>
-        )}
-      </SyncBar>
+      {/* topo: voltar + conexão + cronômetro */}
+      <div className="flex items-center gap-2">
+        <Link
+          href="/"
+          aria-label="Voltar ao início"
+          className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-white text-ink ring-1 ring-black/5"
+        >
+          <ChevronLeft size={20} />
+        </Link>
+        <div className="min-w-0 flex-1">
+          <SyncBar status={syncStatus}>
+            {started && startMs !== null && race.status === "running" ? (
+              <Stopwatch startMs={startMs} now={clock.now} className="shrink-0 text-xl font-semibold" />
+            ) : (
+              <span className="shrink-0 text-sm font-semibold">{finished ? "Encerrada" : "Aguardando largada"}</span>
+            )}
+          </SyncBar>
+        </div>
+      </div>
+
       {clock.state.status === "error" && (
-        <p className="rounded-lg bg-yellow-300 p-2 text-sm font-bold">
-          Relógio não sincronizado com o servidor ({clock.state.message}). Usando o relógio do celular.{" "}
-          <button onClick={clock.sync} className="underline">
+        <Alert tone="warning" icon={<TriangleAlert size={16} />}>
+          Relógio não sincronizado ({clock.state.message}). Usando o relógio do celular.{" "}
+          <button onClick={clock.sync} className="font-semibold underline">
             Tentar de novo
           </button>
-        </p>
+        </Alert>
       )}
-      {(loadError || athletes.error) && (
-        <p className="rounded-lg bg-red-100 p-2 font-bold text-red-800">{loadError ?? athletes.error}</p>
-      )}
+      {(loadError || athletes.error) && <Alert tone="danger">{loadError ?? athletes.error}</Alert>}
 
       {!started ? (
-        <p className="rounded-lg border-4 border-black p-6 text-center text-2xl font-bold">
-          A corrida ainda não largou.
-          <br />
-          <span className="text-base font-normal">Dê a largada na tela Largada.</span>
-        </p>
+        <div className="flex flex-col items-center gap-2 rounded-3xl bg-white px-6 py-12 text-center ring-1 ring-black/5">
+          <p className="text-xl font-semibold">A corrida ainda não largou</p>
+          <p className="text-sm text-ink-soft">
+            Dê a largada na tela{" "}
+            <Link href="/largada" className="font-semibold text-ink underline">
+              Largada
+            </Link>
+            .
+          </p>
+        </div>
+      ) : finished ? (
+        <div className="flex flex-col items-center gap-2 rounded-3xl bg-ink px-6 py-8 text-center text-white">
+          <Lock size={24} className="text-volt" />
+          <p className="text-xl font-semibold">Corrida encerrada</p>
+          <p className="text-sm text-white/70">Novas chegadas estão bloqueadas. Ainda dá para identificar e corrigir as já registradas.</p>
+        </div>
       ) : (
         <button
+          aria-label="CHEGOU"
           onPointerDown={(e) => {
             // pointerdown registra o horário no toque, sem esperar o dedo levantar
             if (e.button === 0) handleChegou();
@@ -205,9 +232,10 @@ export function FinishStation({ race }: { race: Race }) {
               handleChegou();
             }
           }}
-          className="h-[18vh] min-h-28 rounded-2xl bg-yellow-400 text-6xl font-black text-black shadow-lg select-none touch-manipulation active:scale-[0.98] active:bg-yellow-500"
+          className="flex h-[18vh] min-h-28 flex-col items-center justify-center rounded-3xl bg-volt text-ink shadow-[0_8px_24px_-8px_rgba(120,160,0,0.6)] transition select-none touch-manipulation active:scale-[0.98] active:bg-volt-strong"
         >
-          CHEGOU
+          <span className="text-6xl font-black tracking-tight">CHEGOU</span>
+          <span className="text-sm font-medium text-ink/60">toque quando o atleta cruzar a linha</span>
         </button>
       )}
 
@@ -217,19 +245,22 @@ export function FinishStation({ race }: { race: Race }) {
           {feedback ? (
             <FeedbackBox feedback={feedback} onClose={() => setFeedback(null)} />
           ) : (
-            <div className="flex h-full items-center justify-center rounded-2xl border-2 border-dashed border-black/20 text-black/40">
-              {mode === "camera" ? "Toque CHEGOU ou aponte a câmera" : "Toque CHEGOU ou digite o número"}
+            <div className="flex h-full items-center justify-center rounded-2xl border-2 border-dashed border-black/10 text-sm text-ink-soft">
+              {finished
+                ? "Escolha uma chegada abaixo para identificar"
+                : mode === "camera"
+                  ? "Toque CHEGOU ou aponte a câmera"
+                  : "Toque CHEGOU ou digite o número"}
             </div>
           )}
         </div>
       )}
-      {!started && feedback && <FeedbackBox feedback={feedback} onClose={() => setFeedback(null)} />}
 
       {/* alvo do próximo número */}
-      {started && (
+      {started && (selected || pending.length > 0 || !finished) && (
         <div
-          className={`rounded-lg px-3 py-2 text-center font-bold ${
-            selected ? "bg-blue-600 text-white" : pending.length ? "bg-orange-500 text-white" : "bg-black/5"
+          className={`rounded-2xl px-4 py-2.5 text-center text-sm font-semibold ${
+            selected ? "bg-sky-600 text-white" : pending.length ? "bg-amber-400 text-ink" : "bg-white text-ink-soft ring-1 ring-black/5"
           }`}
         >
           {selected ? (
@@ -241,35 +272,26 @@ export function FinishStation({ race }: { race: Race }) {
             </>
           ) : pending.length ? (
             <>
-              {pending.length} {pending.length === 1 ? "chegada aguardando" : "chegadas aguardando"} número ·
-              próxima: {describe(pending[0].finish_time).time}
+              {pending.length} {pending.length === 1 ? "chegada aguardando" : "chegadas aguardando"} número · próxima:{" "}
+              {describe(pending[0].finish_time).time}
             </>
           ) : (
-            "Sem pendências: o número digitado registra a chegada agora"
+            "Sem pendências · o número registra a chegada agora"
           )}
         </div>
       )}
 
-      {started && (
+      {canEnterNumber && (
         <>
-          <div role="tablist" className="grid grid-cols-2 rounded-lg border-2 border-black">
-            {(
-              [
-                ["keypad", "Teclado"],
-                ["camera", "Câmera (QR)"],
-              ] as const
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                role="tab"
-                aria-selected={mode === id}
-                onClick={() => setMode(id)}
-                className={`py-2 text-lg font-bold ${mode === id ? "bg-black text-white" : ""}`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <Segmented<InputMode>
+            ariaLabel="Forma de identificar"
+            value={mode}
+            onChange={setMode}
+            options={[
+              { value: "keypad", label: <><Keyboard size={16} /> Teclado</> },
+              { value: "camera", label: <><Camera size={16} /> Câmera (QR)</> },
+            ]}
+          />
           {mode === "keypad" ? (
             <Keypad value={input} onChange={setInput} onSubmit={handleSubmit} />
           ) : (
@@ -283,8 +305,8 @@ export function FinishStation({ race }: { race: Race }) {
         </>
       )}
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-xl font-bold">Últimas chegadas</h2>
+      <section className="mt-3 flex flex-col gap-2">
+        <h2 className="px-1 text-sm font-semibold tracking-wide text-ink-soft uppercase">Últimas chegadas</h2>
         <RecentList
           finishes={finishes}
           athletesById={athletesById}
@@ -295,33 +317,57 @@ export function FinishStation({ race }: { race: Race }) {
             setSelectedId(f.client_id);
             window.scrollTo({ top: 0, behavior: "smooth" });
           }}
-          onDelete={handleDelete}
+          onDelete={setDeleting}
         />
       </section>
+
+      <ConfirmDialog
+        open={deleting !== null}
+        onClose={() => setDeleting(null)}
+        onConfirm={() => {
+          if (!deleting) return;
+          remove(deleting.client_id);
+          if (selectedId === deleting.client_id) setSelectedId(null);
+        }}
+        tone="danger"
+        title="Excluir esta chegada?"
+        description={
+          deleting &&
+          `${deletingAthlete ? `Nº ${deletingAthlete.bib_number} — ${deletingAthlete.name}` : "Chegada sem número"} · ${describe(deleting.finish_time).time}`
+        }
+        confirmLabel="Excluir chegada"
+      />
     </div>
   );
 }
 
 function FeedbackBox({ feedback, onClose }: { feedback: Feedback; onClose: () => void }) {
-  const base = "flex h-full w-full items-center gap-4 overflow-hidden rounded-2xl px-4 text-left text-white";
+  const base = "flex h-full w-full items-center gap-3 overflow-hidden rounded-2xl px-4 text-left text-white";
   if (feedback.kind === "ok") {
     return (
-      <button onClick={onClose} className={`${base} bg-green-600`}>
-        <span className="text-5xl font-black tabular-nums">{feedback.athlete.bib_number}</span>
-        <span className="min-w-0">
-          <span className="block truncate text-2xl font-bold">{feedback.athlete.name}</span>
-          <span className="block text-xl">
-            <span className="font-mono font-bold">{feedback.time}</span> · {feedback.pace}
+      <button data-testid="feedback" onClick={onClose} className={`${base} bg-emerald-600`}>
+        <span className="tabular flex h-12 min-w-14 items-center justify-center rounded-xl bg-white px-2 font-mono text-2xl font-bold text-emerald-700">
+          {feedback.athlete.bib_number}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-xl font-semibold">{feedback.athlete.name}</span>
+          <span className="block text-base text-white/85">
+            <span className="tabular font-mono font-semibold text-white">{feedback.time}</span> · {feedback.pace}
           </span>
         </span>
+        <CheckCircle2 size={24} className="shrink-0" />
       </button>
     );
   }
   return (
-    <button onClick={onClose} className={`${base} ${feedback.kind === "error" ? "bg-red-600" : "bg-black"}`}>
+    <button
+      data-testid="feedback"
+      onClick={onClose}
+      className={`${base} ${feedback.kind === "error" ? "bg-red-600" : "bg-ink"}`}
+    >
       <span className="min-w-0">
-        <span className="block text-2xl font-black leading-tight">{feedback.title}</span>
-        {feedback.detail && <span className="block leading-tight">{feedback.detail}</span>}
+        <span className="block text-lg leading-tight font-semibold">{feedback.title}</span>
+        {feedback.detail && <span className="block text-sm leading-tight text-white/85">{feedback.detail}</span>}
       </span>
     </button>
   );

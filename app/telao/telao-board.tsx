@@ -1,23 +1,25 @@
 "use client";
 
+import { Flag } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Podium } from "@/components/podium";
+import { BRAND } from "@/lib/brand";
 import { SEX_LABEL } from "@/lib/categories";
 import { parseTimestamp } from "@/lib/clock";
-import { buildResults, filterResults, podiums } from "@/lib/results";
+import { buildResults, filterResults, podiums, type SexFilter } from "@/lib/results";
 import { useServerClock } from "@/lib/server-clock";
-import { formatDuration, formatPace } from "@/lib/time";
-import type { Race, Sex } from "@/lib/types";
+import { elapsedMs, formatDuration, formatPace } from "@/lib/time";
+import type { Race } from "@/lib/types";
 import { useAthletes, useFinishes } from "@/lib/use-race-data";
 import { Stopwatch } from "../stopwatch";
 import { useAutoScroll } from "./use-auto-scroll";
 
 type View = "classificacao" | "premiacao" | "alternar";
-type SexFilter = "all" | Sex;
 
 const ALTERNATE_MS = 40_000;
 const NEW_ARRIVAL_MS = 20_000;
-const MEDALS = ["🥇", "🥈", "🥉"];
+const MEDAL = ["bg-volt text-ink", "bg-zinc-300 text-ink", "bg-amber-600 text-white"];
 
 /** Configuração pela URL (?view=premiacao&sexo=F) para deixar a TV pronta. */
 function useTelaoSettings() {
@@ -68,14 +70,8 @@ export function TelaoBoard({ race }: { race: Race }) {
   const shown = view === "alternar" ? alternate : view;
   const distance = Number(race.distance_km);
   const { rows } = useMemo(() => buildResults(race, athletes.byBib.values(), finishes), [race, athletes.byBib, finishes]);
-  const list = useMemo(
-    () => filterResults(rows, sex === "all" ? { kind: "all" } : { kind: "sex", sex }),
-    [rows, sex],
-  );
-  const podiumList = useMemo(
-    () => podiums(rows).filter((p) => sex === "all" || p.category.sex === sex),
-    [rows, sex],
-  );
+  const list = useMemo(() => filterResults(rows, sex), [rows, sex]);
+  const podiumList = useMemo(() => podiums(rows).filter((p) => sex === "all" || p.category.sex === sex), [rows, sex]);
   const latest = useMemo(
     () => [...rows].sort((a, b) => b.finish.finish_time.localeCompare(a.finish.finish_time)).slice(0, 3),
     [rows],
@@ -92,34 +88,48 @@ export function TelaoBoard({ race }: { race: Race }) {
   return (
     <>
       {/* cabeçalho */}
-      <header className="flex items-center justify-between gap-[2vw] border-b-4 border-yellow-400 px-[2vw] py-[1vw]">
-        <div className="min-w-0">
-          <p className="truncate text-[2.6vw] font-black leading-tight">{race.name}</p>
-          <p className="text-[1.4vw] text-white/70">
-            {rows.length} {rows.length === 1 ? "atleta chegou" : "atletas chegaram"}
-            {sex !== "all" && ` · ${SEX_LABEL[sex]}`}
-            {!status.online && <span className="ml-3 text-red-400">● sem conexão</span>}
-          </p>
+      <header className="flex items-center justify-between gap-[2vw] px-[2.5vw] pt-[1.6vw] pb-[1.2vw]">
+        <div className="flex min-w-0 items-center gap-[1.2vw]">
+          <span className="flex size-[4vw] shrink-0 items-center justify-center rounded-[1vw] bg-volt text-ink">
+            <Flag className="size-[2vw]" strokeWidth={2.5} />
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-[2.6vw] leading-tight font-semibold tracking-tight">{race.name}</p>
+            <p className="text-[1.3vw] text-white/60">
+              {rows.length} {rows.length === 1 ? "atleta chegou" : "atletas chegaram"}
+              {sex !== "all" && ` · ${SEX_LABEL[sex]}`}
+              {!status.online && <span className="ml-3 text-red-400">● sem conexão</span>}
+            </p>
+          </div>
         </div>
         <div className="shrink-0 text-right">
           {race.status === "running" && startMs !== null ? (
-            <Stopwatch startMs={startMs} now={clock.now} className="text-[5vw] font-black text-yellow-400" />
+            <Stopwatch startMs={startMs} now={clock.now} className="text-[5.5vw] leading-none font-semibold text-volt" />
+          ) : race.status === "finished" ? (
+            <div>
+              <p className="text-[1.2vw] font-medium tracking-[0.3em] text-white/50 uppercase">Resultado final</p>
+              {race.start_time && race.finished_at && (
+                <p className="tabular font-mono text-[3.5vw] leading-none font-semibold text-volt">
+                  {formatDuration(elapsedMs(race.start_time, race.finished_at))}
+                </p>
+              )}
+            </div>
           ) : (
-            <span className="text-[3vw] font-black text-yellow-400">
-              {race.status === "finished" ? "RESULTADO FINAL" : "AGUARDANDO LARGADA"}
-            </span>
+            <span className="text-[2.2vw] font-semibold text-white/60">Aguardando largada</span>
           )}
         </div>
       </header>
 
       {/* últimas chegadas */}
       {latest.length > 0 && (
-        <div className="flex gap-[1vw] bg-white/10 px-[2vw] py-[0.8vw] text-[1.8vw]">
-          <span className="shrink-0 font-bold text-white/60">Últimas chegadas:</span>
+        <div className="mx-[2.5vw] flex items-center gap-[1vw] rounded-[1vw] bg-white/[0.06] px-[1.2vw] py-[0.8vw] text-[1.7vw]">
+          <span className="shrink-0 text-[1.2vw] font-medium tracking-[0.2em] text-white/50 uppercase">Chegando</span>
           {latest.map((r) => (
             <span
               key={r.finish.client_id}
-              className={`min-w-0 truncate rounded px-[0.6vw] font-bold ${isNew(r.finish.finish_time) ? "bg-yellow-400 text-black" : ""}`}
+              className={`min-w-0 truncate rounded-[0.6vw] px-[0.8vw] py-[0.2vw] font-semibold ${
+                isNew(r.finish.finish_time) ? "bg-volt text-ink" : "text-white/80"
+              }`}
             >
               {r.athlete.bib_number} {r.athlete.name.split(" ")[0]} · {formatDuration(r.elapsedMs)}
             </span>
@@ -128,106 +138,82 @@ export function TelaoBoard({ race }: { race: Race }) {
       )}
 
       {/* conteúdo com rolagem automática */}
-      <div ref={scrollRef} className="flex-1 overflow-hidden px-[2vw] py-[1vw]">
+      <div ref={scrollRef} className="flex-1 overflow-hidden px-[2.5vw] py-[1.2vw]">
         {shown === "classificacao" ? (
           list.length === 0 ? (
-            <p className="mt-[10vh] text-center text-[3vw] text-white/60">Aguardando as primeiras chegadas…</p>
+            <p className="mt-[12vh] text-center text-[3vw] text-white/50">Aguardando as primeiras chegadas…</p>
           ) : (
             <table className="w-full text-[2.4vw] leading-tight">
               <thead>
-                <tr className="text-left text-[1.3vw] uppercase text-white/50">
-                  <th className="pb-[0.5vw] pr-[1vw]">Pos</th>
-                  <th className="pb-[0.5vw] pr-[1vw]">Nº</th>
-                  <th className="pb-[0.5vw] pr-[1vw]">Nome</th>
-                  <th className="pb-[0.5vw] pr-[1vw]">Categoria</th>
-                  <th className="pb-[0.5vw] pr-[1vw] text-right">Tempo</th>
-                  <th className="pb-[0.5vw] text-right">Ritmo</th>
+                <tr className="text-left text-[1.1vw] font-medium tracking-[0.2em] text-white/40 uppercase">
+                  <th className="pr-[1vw] pb-[0.6vw]">Pos</th>
+                  <th className="pr-[1vw] pb-[0.6vw]">Nº</th>
+                  <th className="pr-[1vw] pb-[0.6vw]">Atleta</th>
+                  <th className="pr-[1vw] pb-[0.6vw]">Sexo</th>
+                  <th className="pr-[1vw] pb-[0.6vw] text-right">Tempo</th>
+                  <th className="pb-[0.6vw] text-right">Ritmo</th>
                 </tr>
               </thead>
               <tbody>
-                {list.map((r) => (
-                  <tr
-                    key={r.finish.client_id}
-                    className={`border-t border-white/15 ${isNew(r.finish.finish_time) ? "bg-yellow-400 text-black" : ""}`}
-                  >
-                    <td className="py-[0.4vw] pr-[1vw] font-black tabular-nums">{r.position}º</td>
-                    <td className="py-[0.4vw] pr-[1vw] font-bold tabular-nums">{r.athlete.bib_number}</td>
-                    <td className="max-w-[35vw] truncate py-[0.4vw] pr-[1vw] font-bold">{r.athlete.name}</td>
-                    <td className="py-[0.4vw] pr-[1vw] text-[1.8vw]">
-                      {r.band?.label} {r.athlete.sex}
-                    </td>
-                    <td className="py-[0.4vw] pr-[1vw] text-right font-mono font-black tabular-nums">
-                      {formatDuration(r.elapsedMs)}
-                    </td>
-                    <td className="py-[0.4vw] text-right font-mono text-[1.8vw] tabular-nums">
-                      {formatPace(r.elapsedMs, distance).replace(" /km", "")}
-                    </td>
-                  </tr>
-                ))}
+                {list.map((r) => {
+                  const fresh = isNew(r.finish.finish_time);
+                  return (
+                    <tr key={r.finish.client_id} className={`border-t border-white/10 ${fresh ? "bg-volt text-ink" : ""}`}>
+                      <td className="py-[0.5vw] pr-[1vw]">
+                        <span
+                          className={`tabular inline-flex size-[3.2vw] items-center justify-center rounded-full text-[1.6vw] font-bold ${
+                            fresh ? "bg-ink text-volt" : (MEDAL[r.position - 1] ?? "text-white/70")
+                          }`}
+                        >
+                          {r.position}º
+                        </span>
+                      </td>
+                      <td className="tabular py-[0.5vw] pr-[1vw] font-mono font-semibold">{r.athlete.bib_number}</td>
+                      <td className="max-w-[40vw] truncate py-[0.5vw] pr-[1vw] font-semibold">{r.athlete.name}</td>
+                      <td className={`py-[0.5vw] pr-[1vw] text-[1.8vw] ${fresh ? "" : "text-white/60"}`}>{r.athlete.sex}</td>
+                      <td className="tabular py-[0.5vw] pr-[1vw] text-right font-mono font-semibold">{formatDuration(r.elapsedMs)}</td>
+                      <td className={`tabular py-[0.5vw] text-right font-mono text-[1.8vw] ${fresh ? "" : "text-white/60"}`}>
+                        {formatPace(r.elapsedMs, distance).replace(" /km", "")}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )
         ) : (
-          <div className="grid grid-cols-2 gap-[1.2vw] lg:grid-cols-3">
-            {podiumList.map(({ category, winners }) => (
-              <section key={category.id} className="rounded-lg border-2 border-white/30 p-[1vw]">
-                <h3 className="mb-[0.5vw] text-[1.8vw] font-black text-yellow-400">{category.label}</h3>
-                {MEDALS.map((medal, i) => {
-                  const w = winners[i];
-                  return (
-                    <p key={medal} className="flex items-center gap-[0.6vw] text-[1.6vw] leading-snug">
-                      <span>{medal}</span>
-                      {w ? (
-                        <>
-                          <span className="min-w-0 flex-1 truncate font-bold">
-                            {w.athlete.bib_number} {w.athlete.name}
-                          </span>
-                          <span className="font-mono tabular-nums">{formatDuration(w.elapsedMs)}</span>
-                        </>
-                      ) : (
-                        <span className="text-white/30">—</span>
-                      )}
-                    </p>
-                  );
-                })}
-              </section>
+          <div className={`mx-auto grid gap-[3vw] pt-[2vw] text-[1.6vw] ${podiumList.length > 1 ? "grid-cols-2" : "max-w-[50vw]"}`}>
+            {podiumList.map((p) => (
+              <div key={p.category.id} className="rounded-[1.5vw] bg-white/[0.04] p-[2vw] ring-1 ring-white/10">
+                <Podium podium={p} tv />
+              </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* controles discretos */}
-      <div className="absolute bottom-2 right-2 flex gap-2 text-sm opacity-40 transition-opacity hover:opacity-100 focus-within:opacity-100">
-        <select
-          aria-label="Visão"
-          value={view}
-          onChange={(e) => setView(e.target.value as View)}
-          className="rounded bg-white/20 px-2 py-1"
-        >
-          <option value="classificacao">Classificação</option>
-          <option value="premiacao">Premiação</option>
-          <option value="alternar">Alternar</option>
-        </select>
-        <select
-          aria-label="Sexo"
-          value={sex}
-          onChange={(e) => setSex(e.target.value as SexFilter)}
-          className="rounded bg-white/20 px-2 py-1"
-        >
-          <option value="all">Geral</option>
-          <option value="M">Masculino</option>
-          <option value="F">Feminino</option>
-        </select>
-        <button
-          onClick={() => document.documentElement.requestFullscreen?.().catch(() => {})}
-          className="rounded bg-white/20 px-2 py-1"
-        >
-          Tela cheia
-        </button>
-        <Link href="/resultados" className="rounded bg-white/20 px-2 py-1">
-          Sair
-        </Link>
-      </div>
+      <footer className="flex items-center justify-between px-[2.5vw] pb-[1vw] text-[1vw] text-white/30">
+        <span>{BRAND.name}</span>
+        {/* controles discretos */}
+        <div className="flex gap-2 text-sm opacity-50 transition-opacity focus-within:opacity-100 hover:opacity-100">
+          <select aria-label="Visão" value={view} onChange={(e) => setView(e.target.value as View)} className="rounded-lg bg-white/10 px-2 py-1 text-white">
+            <option value="classificacao">Classificação</option>
+            <option value="premiacao">Premiação</option>
+            <option value="alternar">Alternar</option>
+          </select>
+          <select aria-label="Sexo" value={sex} onChange={(e) => setSex(e.target.value as SexFilter)} className="rounded-lg bg-white/10 px-2 py-1 text-white">
+            <option value="all">Geral</option>
+            <option value="M">Masculino</option>
+            <option value="F">Feminino</option>
+          </select>
+          <button onClick={() => document.documentElement.requestFullscreen?.().catch(() => {})} className="rounded-lg bg-white/10 px-2 py-1 text-white">
+            Tela cheia
+          </button>
+          <Link href="/resultados" className="rounded-lg bg-white/10 px-2 py-1 text-white">
+            Sair
+          </Link>
+        </div>
+      </footer>
     </>
   );
 }

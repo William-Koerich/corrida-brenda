@@ -74,7 +74,7 @@ export function QrScanner({ onScan, onInvalid }: Props) {
     <div className="relative flex flex-col gap-2">
       <div
         id={elementId}
-        className="aspect-[4/3] w-full overflow-hidden rounded-lg bg-black [&_video]:!h-full [&_video]:!w-full [&_video]:object-cover"
+        className="aspect-[4/3] w-full overflow-hidden rounded-2xl bg-ink [&_video]:!h-full [&_video]:!w-full [&_video]:object-cover"
       />
       {status.kind === "starting" && (
         <p className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-lg font-bold text-white">
@@ -82,14 +82,14 @@ export function QrScanner({ onScan, onInvalid }: Props) {
         </p>
       )}
       {status.kind === "error" && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-lg bg-red-600 p-4 text-center text-white">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-2xl bg-red-600 p-4 text-center text-white">
           <p className="text-lg font-bold">{status.message}</p>
           <button
             onClick={() => {
               setStatus({ kind: "starting" });
               setAttempt((n) => n + 1);
             }}
-            className="rounded-lg bg-white px-4 py-2 font-bold text-red-700"
+            className="rounded-xl bg-white px-4 py-2 font-semibold text-red-700"
           >
             Tentar de novo
           </button>

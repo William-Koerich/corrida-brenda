@@ -1,21 +1,30 @@
 "use client";
 
+import { FileDown, Pencil, Search, Trash2, Upload, Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { BibChip, SexBadge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Alert, Card, EmptyState, PageHeader } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/field";
 import type { AthleteInput } from "@/lib/athletes";
 import { stripAccents } from "@/lib/athletes";
 import { friendlyError } from "@/lib/errors";
 import { getSupabase } from "@/lib/supabase";
 import type { Athlete, Race } from "@/lib/types";
 import { AthleteForm } from "./athlete-form";
-import { CsvImport } from "./csv-import";
+import { CsvImportDialog } from "./csv-import";
 
 export function AthletesManager({ race }: { race: Race }) {
   const [athletes, setAthletes] = useState<Athlete[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<Athlete | undefined>();
-  const [pdfStatus, setPdfStatus] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<Athlete | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
 
   const load = useCallback(async () => {
     const { data, error } = await getSupabase()
@@ -38,14 +47,13 @@ export function AthletesManager({ race }: { race: Race }) {
   }, [load]);
 
   const bibs = useMemo(() => new Set(athletes.map((a) => a.bib_number)), [athletes]);
+  const women = athletes.filter((a) => a.sex === "F").length;
 
   const filtered = useMemo(() => {
     const q = stripAccents(search.trim().toLowerCase());
     if (!q) return athletes;
     return athletes.filter(
-      (a) =>
-        String(a.bib_number).includes(q) ||
-        stripAccents(a.name.toLowerCase()).includes(q),
+      (a) => String(a.bib_number).includes(q) || stripAccents(a.name.toLowerCase()).includes(q),
     );
   }, [athletes, search]);
 
@@ -70,13 +78,9 @@ export function AthletesManager({ race }: { race: Race }) {
   }
 
   async function remove(athlete: Athlete) {
-    const ok = window.confirm(
-      `Excluir nº ${athlete.bib_number} — ${athlete.name}?\n\nSe ele já tiver chegada registrada, a chegada fica sem identificação.`,
-    );
-    if (!ok) return;
     const { error } = await getSupabase().from("athletes").delete().eq("id", athlete.id);
     if (error) {
-      window.alert(friendlyError(error));
+      setActionError(friendlyError(error));
       return;
     }
     if (editing?.id === athlete.id) setEditing(undefined);
@@ -84,95 +88,139 @@ export function AthletesManager({ race }: { race: Race }) {
   }
 
   async function generatePdf() {
-    setPdfStatus("Gerando PDF…");
+    setPdfBusy(true);
+    setActionError(null);
     try {
       const { downloadBibsPdf } = await import("@/lib/bib-pdf");
       await downloadBibsPdf(athletes, race.name);
-      setPdfStatus(null);
     } catch (e) {
-      setPdfStatus(`Erro ao gerar PDF: ${friendlyError(e)}`);
+      setActionError(`Erro ao gerar PDF: ${friendlyError(e)}`);
+    } finally {
+      setPdfBusy(false);
     }
   }
 
   return (
     <div className="flex flex-col gap-6">
-      <p className="text-lg">
-        <strong>{race.name}</strong> · {athletes.length} atletas cadastrados
-      </p>
-
-      <AthleteForm
-        key={editing?.id ?? "novo"}
-        editing={editing}
-        isBibTaken={(bib) => bibs.has(bib) && bib !== editing?.bib_number}
-        onSubmit={save}
-        onCancel={() => setEditing(undefined)}
+      <PageHeader
+        title="Atletas"
+        description={
+          <span>
+            {race.name} · <strong className="text-ink">{athletes.length}</strong> inscritos ·{" "}
+            {athletes.length - women} masculino · {women} feminino
+          </span>
+        }
+        actions={
+          <>
+            <Button icon={<Upload size={16} />} onClick={() => setImportOpen(true)}>
+              Importar CSV
+            </Button>
+            <Button variant="primary" icon={<FileDown size={16} />} onClick={generatePdf} disabled={!athletes.length || pdfBusy}>
+              {pdfBusy ? "Gerando PDF…" : "Gerar números de peito"}
+            </Button>
+          </>
+        }
       />
 
-      <CsvImport existingBibs={bibs} onImport={importMany} />
+      {actionError && <Alert tone="danger">{actionError}</Alert>}
 
-      <section className="flex flex-col gap-3">
-        <button
-          onClick={generatePdf}
-          disabled={athletes.length === 0 || pdfStatus === "Gerando PDF…"}
-          className="rounded-lg bg-yellow-400 py-4 text-lg font-bold text-black border-2 border-black disabled:opacity-50"
-        >
-          Gerar números de peito (PDF)
-        </button>
-        {pdfStatus && <p className="font-bold">{pdfStatus}</p>}
-      </section>
+      <div className="grid items-start gap-6 lg:grid-cols-[360px_1fr]">
+        <div className="lg:sticky lg:top-24">
+          <AthleteForm
+            key={editing?.id ?? "novo"}
+            editing={editing}
+            isBibTaken={(bib) => bibs.has(bib) && bib !== editing?.bib_number}
+            onSubmit={save}
+            onCancel={() => setEditing(undefined)}
+          />
+        </div>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xl font-bold">Lista</h2>
-        <input
-          type="search"
-          placeholder="Buscar por nome ou número"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-lg border-2 border-black px-3 py-3 text-lg"
-        />
+        <Card>
+          <div className="border-b border-line p-4">
+            <div className="relative">
+              <Search size={16} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-soft" />
+              <Input
+                type="search"
+                placeholder="Buscar por nome ou número"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          </div>
 
-        {loading && <p>Carregando atletas…</p>}
-        {loadError && (
-          <p className="font-bold text-red-700">
-            {loadError}{" "}
-            <button onClick={load} className="underline">
-              Tentar de novo
-            </button>
-          </p>
-        )}
-        {!loading && !loadError && filtered.length === 0 && (
-          <p>{athletes.length ? "Nenhum atleta encontrado." : "Nenhum atleta cadastrado ainda."}</p>
-        )}
+          {loading && <p className="p-6 text-center text-ink-soft">Carregando atletas…</p>}
+          {loadError && (
+            <div className="p-4">
+              <Alert tone="danger">
+                {loadError}{" "}
+                <button onClick={load} className="font-semibold underline">
+                  Tentar de novo
+                </button>
+              </Alert>
+            </div>
+          )}
+          {!loading && !loadError && filtered.length === 0 && (
+            <EmptyState
+              icon={<Users size={22} />}
+              title={athletes.length ? "Nenhum atleta encontrado" : "Nenhum atleta cadastrado"}
+              description={athletes.length ? "Tente outro nome ou número." : "Cadastre no formulário ou importe uma planilha CSV."}
+            />
+          )}
 
-        <ul className="flex flex-col divide-y-2 divide-black/10">
-          {filtered.map((a) => (
-            <li key={a.id} className="flex items-center gap-3 py-3">
-              <span className="w-16 shrink-0 text-2xl font-bold tabular-nums">{a.bib_number}</span>
-              <span className="flex-1 min-w-0">
-                <span className="block truncate font-bold">{a.name}</span>
-                <span className="text-sm">
-                  {a.age} anos · {a.sex === "M" ? "Masculino" : "Feminino"}
+          <ul className="divide-y divide-line">
+            {filtered.map((a) => (
+              <li
+                key={a.id}
+                className={`flex items-center gap-3 px-4 py-3 ${editing?.id === a.id ? "bg-volt-soft/60" : ""}`}
+              >
+                <BibChip bib={a.bib_number} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">{a.name}</span>
+                  <span className="text-sm text-ink-soft">{a.age} anos</span>
                 </span>
-              </span>
-              <button
-                onClick={() => {
-                  setEditing(a);
-                  window.scrollTo({ top: 0, behavior: "smooth" });
-                }}
-                className="rounded-lg border-2 border-black px-3 py-2 font-bold"
-              >
-                Editar
-              </button>
-              <button
-                onClick={() => remove(a)}
-                className="rounded-lg border-2 border-red-700 px-3 py-2 font-bold text-red-700"
-              >
-                Excluir
-              </button>
-            </li>
-          ))}
-        </ul>
-      </section>
+                <SexBadge sex={a.sex} />
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label="Editar"
+                    title="Editar"
+                    onClick={() => {
+                      setEditing(a);
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                  >
+                    <Pencil size={16} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label="Excluir"
+                    title="Excluir"
+                    className="text-red-700 hover:bg-red-50"
+                    onClick={() => setDeleting(a)}
+                  >
+                    <Trash2 size={16} />
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      </div>
+
+      <CsvImportDialog open={importOpen} onClose={() => setImportOpen(false)} existingBibs={bibs} onImport={importMany} />
+
+      <ConfirmDialog
+        open={deleting !== null}
+        onClose={() => setDeleting(null)}
+        onConfirm={() => (deleting ? remove(deleting) : undefined)}
+        tone="danger"
+        title={deleting ? `Excluir nº ${deleting.bib_number} — ${deleting.name}?` : ""}
+        description="Se o atleta já tiver chegada registrada, a chegada fica sem identificação."
+        confirmLabel="Excluir atleta"
+      />
     </div>
   );
 }
