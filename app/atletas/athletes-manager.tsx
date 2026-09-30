@@ -172,7 +172,7 @@ export function AthletesManager({ race }: { race: Race }) {
             {filtered.map((a) => (
               <li
                 key={a.id}
-                className={`flex items-center gap-3 px-4 py-3 ${editing?.id === a.id ? "bg-volt-soft/60" : ""}`}
+                className={`flex items-center gap-3 px-4 py-3 ${editing?.id === a.id ? "bg-brand-soft/60" : ""}`}
               >
                 <BibChip bib={a.bib_number} />
                 <span className="min-w-0 flex-1">

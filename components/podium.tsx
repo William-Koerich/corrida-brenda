@@ -4,7 +4,7 @@ import { formatDuration } from "@/lib/time";
 // altura e cor de cada degrau, do 1º ao 5º
 const STEP_HEIGHT = ["h-28", "h-20", "h-14", "h-10", "h-8"];
 const STEP_HEIGHT_TV = ["h-[10vw]", "h-[7vw]", "h-[5vw]", "h-[3.6vw]", "h-[2.8vw]"];
-const STEP_COLOR = ["bg-volt text-ink", "bg-zinc-300 text-ink", "bg-amber-600 text-white"];
+const STEP_COLOR = ["bg-brand text-ink", "bg-zinc-300 text-ink", "bg-amber-600 text-white"];
 
 /** Ordem dos degraus da esquerda para a direita: 1º no centro (3 → 2,1,3 · 5 → 4,2,1,3,5). */
 export function podiumOrder(size: number): number[] {
@@ -21,7 +21,7 @@ export function Podium({ podium, tv = false }: { podium: PodiumData; tv?: boolea
 
   return (
     <div>
-      <h3 className={`text-center font-semibold tracking-tight ${tv ? "mb-[1.5vw] text-[2.4vw] text-volt" : "mb-4 text-lg"}`}>
+      <h3 className={`text-center font-semibold tracking-tight ${tv ? "mb-[1.5vw] text-[2.4vw] text-brand" : "mb-4 text-lg"}`}>
         {podium.category.label}{" "}
         <span className={`ml-1 font-normal ${tv ? "text-[1.4vw] text-white/40" : "text-sm text-ink-soft"}`}>top {size}</span>
       </h3>
@@ -72,7 +72,7 @@ export function Podium({ podium, tv = false }: { podium: PodiumData; tv?: boolea
   );
 }
 
-const MEDAL = ["bg-volt text-ink", "bg-zinc-300 text-ink", "bg-amber-600 text-white"];
+const MEDAL = ["bg-brand text-ink", "bg-zinc-300 text-ink", "bg-amber-600 text-white"];
 
 /** Posição com destaque para o top 3. */
 export function PositionBadge({ position }: { position: number }) {

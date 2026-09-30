@@ -23,7 +23,7 @@ function isActive(pathname: string, href: string) {
 export function Logo({ compact = false }: { compact?: boolean }) {
   return (
     <Link href="/" className="flex items-center gap-2.5">
-      <span className="flex size-9 items-center justify-center rounded-xl bg-volt text-ink shadow-sm">
+      <span className="flex size-9 items-center justify-center rounded-xl bg-brand text-ink shadow-sm">
         <Flag size={18} strokeWidth={2.5} />
       </span>
       {!compact && <span className="text-[15px] font-semibold tracking-tight">{BRAND.name}</span>}
@@ -97,7 +97,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 href={href}
                 className={`flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium ${active ? "text-ink" : "text-ink-soft"}`}
               >
-                <span className={`rounded-full px-4 py-1 ${active ? "bg-volt" : ""}`}>
+                <span className={`rounded-full px-4 py-1 ${active ? "bg-brand" : ""}`}>
                   <Icon size={20} strokeWidth={active ? 2.5 : 2} />
                 </span>
                 {label}

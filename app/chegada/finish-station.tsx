@@ -215,7 +215,7 @@ export function FinishStation({ race }: { race: Race }) {
         </div>
       ) : finished ? (
         <div className="flex flex-col items-center gap-2 rounded-3xl bg-ink px-6 py-8 text-center text-white">
-          <Lock size={24} className="text-volt" />
+          <Lock size={24} className="text-brand" />
           <p className="text-xl font-semibold">Corrida encerrada</p>
           <p className="text-sm text-white/70">Novas chegadas estão bloqueadas. Ainda dá para identificar e corrigir as já registradas.</p>
         </div>
@@ -232,7 +232,7 @@ export function FinishStation({ race }: { race: Race }) {
               handleChegou();
             }
           }}
-          className="flex h-[18vh] min-h-28 flex-col items-center justify-center rounded-3xl bg-volt text-ink shadow-[0_8px_24px_-8px_rgba(120,160,0,0.6)] transition select-none touch-manipulation active:scale-[0.98] active:bg-volt-strong"
+          className="flex h-[18vh] min-h-28 flex-col items-center justify-center rounded-3xl bg-brand text-ink shadow-[0_8px_24px_-8px_rgba(240,39,127,0.55)] transition select-none touch-manipulation active:scale-[0.98] active:bg-brand-strong"
         >
           <span className="text-6xl font-black tracking-tight">CHEGOU</span>
           <span className="text-sm font-medium text-ink/60">toque quando o atleta cruzar a linha</span>
@@ -276,7 +276,7 @@ export function FinishStation({ race }: { race: Race }) {
               {describe(pending[0].finish_time).time}
             </>
           ) : (
-            "Sem pendências · o número registra a chegada agora"
+            "Sem chegadas aguardando número"
           )}
         </div>
       )}

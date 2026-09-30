@@ -210,7 +210,7 @@ Configuradas em `lib/categories.ts`. O padrão é:
 ## Visual
 
 - Componentes em `components/ui/`: botão, cartão, selo de status, abas, campos e caixa de confirmação.
-- Paleta em `app/globals.css` (`ink`, `canvas`, `volt`…). O destaque verde-limão (`volt`) é usado no CHEGOU, no cronômetro e no telão.
+- Paleta em `app/globals.css` (`ink`, `canvas`, `brand`…). O destaque rosa (`brand`, tema da corrida) é usado no CHEGOU, no cronômetro, no pódio e no telão. Para trocar a cor do produto, mude só as três variáveis `--color-brand*`.
 - O app é sempre claro (`color-scheme: light`), para ficar legível no sol e igual em qualquer celular. O telão é escuro.
 - No celular, a navegação fica em abas embaixo. No computador, fica no cabeçalho.
 - `/chegada` é modo foco, sem menus. `/telao` é tela inteira.

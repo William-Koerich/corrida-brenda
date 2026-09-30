@@ -12,7 +12,7 @@ function describe({ online, pending, syncing }: SyncStatus) {
   if (pending) {
     return { tone: "bg-amber-400 text-ink", icon: <CloudUpload size={16} />, text: `${syncing ? "Enviando" : "Online"} · ${pendingText}` };
   }
-  return { tone: "bg-ink text-white", icon: <Wifi size={16} className="text-volt" />, text: "Online" };
+  return { tone: "bg-ink text-white", icon: <Wifi size={16} className="text-brand" />, text: "Online" };
 }
 
 /** Barra de status: online / offline / X chegadas pendentes de envio, com conteúdo à direita. */

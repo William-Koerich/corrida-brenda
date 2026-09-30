@@ -11,9 +11,9 @@
   --color-ink-soft: #4b5563; /* texto secundário */
   --color-canvas: #f3f4f6; /* fundo do app */
   --color-line: #e5e7eb; /* bordas */
-  --color-volt: #c6f432; /* destaque da marca (verde-limão) */
-  --color-volt-strong: #a8d61a;
-  --color-volt-soft: #f1fcd0;
+  --color-brand: #ff4d9d; /* destaque da marca (rosa, tema da corrida) */
+  --color-brand-strong: #f0277f; /* hover / pressionado */
+  --color-brand-soft: #ffe3f0; /* fundos suaves */
 }
 
 :root {

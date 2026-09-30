@@ -89,7 +89,7 @@ export function StartPanel({ race }: { race: Race }) {
 
       {/* painel principal */}
       <section className="relative overflow-hidden rounded-3xl bg-ink px-6 py-10 text-center text-white shadow-lg sm:py-14">
-        <div className="pointer-events-none absolute -bottom-32 left-1/2 size-96 -translate-x-1/2 rounded-full bg-volt/15 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-32 left-1/2 size-96 -translate-x-1/2 rounded-full bg-brand/15 blur-3xl" />
         <div className="relative flex flex-col items-center gap-6">
           {race.status === "not_started" && (
             <>
@@ -99,7 +99,7 @@ export function StartPanel({ race }: { race: Race }) {
               </p>
               <button
                 onClick={() => setConfirming("start")}
-                className="flex size-52 flex-col items-center justify-center gap-2 rounded-full bg-volt text-ink shadow-[0_0_0_12px_rgba(198,244,50,0.15)] transition hover:bg-volt-strong active:scale-95 sm:size-60"
+                className="flex size-52 flex-col items-center justify-center gap-2 rounded-full bg-brand text-ink shadow-[0_0_0_12px_rgba(255,77,157,0.18)] transition hover:bg-brand-strong active:scale-95 sm:size-60"
               >
                 <Flag size={40} strokeWidth={2.5} />
                 <span className="text-2xl font-black tracking-tight">DAR LARGADA</span>
@@ -110,7 +110,7 @@ export function StartPanel({ race }: { race: Race }) {
           {race.status === "running" && startMs !== null && (
             <>
               <p className="text-xs font-medium tracking-widest text-white/50 uppercase">Tempo de prova</p>
-              <Stopwatch startMs={startMs} now={clock.now} className="text-6xl font-semibold text-volt sm:text-8xl" />
+              <Stopwatch startMs={startMs} now={clock.now} className="text-6xl font-semibold text-brand sm:text-8xl" />
               <p className="text-white/70">Largada às {time(race.start_time!)} · horário do servidor</p>
             </>
           )}

@@ -19,7 +19,7 @@ type View = "classificacao" | "premiacao" | "alternar";
 
 const ALTERNATE_MS = 40_000;
 const NEW_ARRIVAL_MS = 20_000;
-const MEDAL = ["bg-volt text-ink", "bg-zinc-300 text-ink", "bg-amber-600 text-white"];
+const MEDAL = ["bg-brand text-ink", "bg-zinc-300 text-ink", "bg-amber-600 text-white"];
 
 /** Configuração pela URL (?view=premiacao&sexo=F) para deixar a TV pronta. */
 function useTelaoSettings() {
@@ -90,7 +90,7 @@ export function TelaoBoard({ race }: { race: Race }) {
       {/* cabeçalho */}
       <header className="flex items-center justify-between gap-[2vw] px-[2.5vw] pt-[1.6vw] pb-[1.2vw]">
         <div className="flex min-w-0 items-center gap-[1.2vw]">
-          <span className="flex size-[4vw] shrink-0 items-center justify-center rounded-[1vw] bg-volt text-ink">
+          <span className="flex size-[4vw] shrink-0 items-center justify-center rounded-[1vw] bg-brand text-ink">
             <Flag className="size-[2vw]" strokeWidth={2.5} />
           </span>
           <div className="min-w-0">
@@ -104,12 +104,12 @@ export function TelaoBoard({ race }: { race: Race }) {
         </div>
         <div className="shrink-0 text-right">
           {race.status === "running" && startMs !== null ? (
-            <Stopwatch startMs={startMs} now={clock.now} className="text-[5.5vw] leading-none font-semibold text-volt" />
+            <Stopwatch startMs={startMs} now={clock.now} className="text-[5.5vw] leading-none font-semibold text-brand" />
           ) : race.status === "finished" ? (
             <div>
               <p className="text-[1.2vw] font-medium tracking-[0.3em] text-white/50 uppercase">Resultado final</p>
               {race.start_time && race.finished_at && (
-                <p className="tabular font-mono text-[3.5vw] leading-none font-semibold text-volt">
+                <p className="tabular font-mono text-[3.5vw] leading-none font-semibold text-brand">
                   {formatDuration(elapsedMs(race.start_time, race.finished_at))}
                 </p>
               )}
@@ -128,7 +128,7 @@ export function TelaoBoard({ race }: { race: Race }) {
             <span
               key={r.finish.client_id}
               className={`min-w-0 truncate rounded-[0.6vw] px-[0.8vw] py-[0.2vw] font-semibold ${
-                isNew(r.finish.finish_time) ? "bg-volt text-ink" : "text-white/80"
+                isNew(r.finish.finish_time) ? "bg-brand text-ink" : "text-white/80"
               }`}
             >
               {r.athlete.bib_number} {r.athlete.name.split(" ")[0]} · {formatDuration(r.elapsedMs)}
@@ -158,11 +158,11 @@ export function TelaoBoard({ race }: { race: Race }) {
                 {list.map((r) => {
                   const fresh = isNew(r.finish.finish_time);
                   return (
-                    <tr key={r.finish.client_id} className={`border-t border-white/10 ${fresh ? "bg-volt text-ink" : ""}`}>
+                    <tr key={r.finish.client_id} className={`border-t border-white/10 ${fresh ? "bg-brand text-ink" : ""}`}>
                       <td className="py-[0.5vw] pr-[1vw]">
                         <span
                           className={`tabular inline-flex size-[3.2vw] items-center justify-center rounded-full text-[1.6vw] font-bold ${
-                            fresh ? "bg-ink text-volt" : (MEDAL[r.position - 1] ?? "text-white/70")
+                            fresh ? "bg-ink text-brand" : (MEDAL[r.position - 1] ?? "text-white/70")
                           }`}
                         >
                           {r.position}º

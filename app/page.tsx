@@ -36,7 +36,7 @@ function Dashboard({ race }: { race: Race }) {
     <div className="flex flex-col gap-8">
       {/* corrida atual */}
       <section className="relative overflow-hidden rounded-3xl bg-ink p-6 text-white shadow-lg sm:p-8">
-        <div className="pointer-events-none absolute -top-24 -right-24 size-72 rounded-full bg-volt/20 blur-3xl" />
+        <div className="pointer-events-none absolute -top-24 -right-24 size-72 rounded-full bg-brand/20 blur-3xl" />
         <div className="relative flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-sm font-medium text-white/60">{BRAND.tagline}</p>
@@ -50,7 +50,7 @@ function Dashboard({ race }: { race: Race }) {
           <div className="text-left sm:text-right">
             <p className="text-xs font-medium tracking-widest text-white/50 uppercase">Tempo de prova</p>
             {race.status === "running" && startMs ? (
-              <Stopwatch startMs={startMs} now={clock.now} className="text-5xl font-semibold text-volt sm:text-6xl" />
+              <Stopwatch startMs={startMs} now={clock.now} className="text-5xl font-semibold text-brand sm:text-6xl" />
             ) : (
               <p className="tabular font-mono text-5xl font-semibold text-white/40 sm:text-6xl">
                 {race.status === "finished" && race.start_time && race.finished_at
@@ -74,7 +74,7 @@ function Dashboard({ race }: { race: Race }) {
           {STEPS.map(({ href, icon: Icon, title, text }) => (
             <Link key={href} href={href} className="group">
               <Card className="flex h-full items-start gap-4 p-5 transition group-hover:shadow-md group-hover:ring-black/10">
-                <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-volt-soft text-ink ring-1 ring-volt-strong/30">
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-ink ring-1 ring-brand-strong/30">
                   <Icon size={20} />
                 </span>
                 <span className="min-w-0 flex-1">
