@@ -132,7 +132,7 @@ Os tempos são aproximados: o importante é a **ordem** das ondas. "Simultâneo"
 | ☐ | `/largada` | "20/20 atletas chegaram" e "0 chegadas sem número" |
 | ☐ | `/resultados` → Classificação | 20 classificados, sem quadro laranja, ordem coerente com o cronograma |
 | ☐ | Filtros Masculino e Feminino | Posições recalculadas, com a posição geral embaixo |
-| ☐ | Aba Premiação | Dois pódios: geral masculino e geral feminino, com 1º, 2º e 3º |
+| ☐ | Aba Premiação | Dois pódios: geral masculino (1º a 3º) e geral feminino (1º a 5º) |
 | ☐ | **Exportar CSV** e abrir no Excel | 21 linhas (cabeçalho + 20), acentos corretos, colunas separadas |
 | ☐ | Telão em **Alternar** | Troca entre classificação e premiação a cada 40 s, e rola sozinho |
 

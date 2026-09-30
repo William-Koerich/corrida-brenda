@@ -1,4 +1,4 @@
-import { CATEGORIES, PODIUM_SIZE, SEX_LABEL, type Category } from "./categories";
+import { CATEGORIES, SEX_LABEL, type Category } from "./categories";
 import { elapsedMs, formatDuration, formatPace } from "./time";
 import type { Athlete, Finish, Race, Sex } from "./types";
 
@@ -54,11 +54,11 @@ export interface Podium {
   winners: ResultRow[];
 }
 
-/** Pódio geral masculino e geral feminino. */
-export function podiums(rows: ResultRow[], size = PODIUM_SIZE): Podium[] {
+/** Pódio geral masculino e geral feminino, cada um com o seu tamanho. */
+export function podiums(rows: ResultRow[]): Podium[] {
   return CATEGORIES.map((category) => ({
     category,
-    winners: rows.filter((r) => r.athlete.sex === category.sex).slice(0, size),
+    winners: rows.filter((r) => r.athlete.sex === category.sex).slice(0, category.podiumSize),
   }));
 }
 

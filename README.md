@@ -178,7 +178,7 @@ A tela `/resultados` atualiza em tempo real. Novas chegadas, números associados
 - **Classificação:** posição, número, nome, idade, sexo, tempo total (hh:mm:ss) e ritmo (min/km), em ordem de tempo.
   - Filtros: Geral, Masculino e Feminino.
   - Com filtro, a posição é dentro do filtro, e a posição geral aparece embaixo.
-- **Premiação:** pódio visual (top 3) geral masculino e geral feminino.
+- **Premiação:** pódio visual geral masculino (top 3) e geral feminino (top 5).
 - **Chegadas sem atleta identificado** aparecem numa seção laranja no topo, onde dá para associar o número ou excluir a chegada.
 - **Exportar CSV:** classificação geral completa, com a posição geral e a posição dentro do sexo. Usa separador `;` e UTF-8 com BOM, e abre direto no Excel em português.
 
@@ -205,7 +205,7 @@ Cálculos (funções puras com testes em `lib/*.test.ts`, rode `npm test`):
 
 Configuradas em `lib/categories.ts`. O padrão é:
 
-- Geral masculino e geral feminino, top 3 (`PODIUM_SIZE`).
+- Geral masculino: top 3. Geral feminino: top 5. Para mudar, edite `PODIUM_SIZE` em `lib/categories.ts`; o pódio visual se ajusta sozinho.
 
 ## Visual
 

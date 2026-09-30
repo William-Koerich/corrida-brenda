@@ -84,11 +84,27 @@ describe("filterResults", () => {
 describe("podiums", () => {
   const { rows } = buildResults(race, athletes, finishes);
 
-  it("só geral masculino e geral feminino, top 3", () => {
+  it("só geral masculino e geral feminino", () => {
     const list = podiums(rows);
     expect(list.map((p) => p.category.label)).toEqual(["Geral Masculino", "Geral Feminino"]);
-    expect(list[0].winners.map((w) => w.athlete.bib_number)).toEqual([10, 11]);
-    expect(list[1].winners.map((w) => w.athlete.bib_number)).toEqual([1, 2, 3]);
+    expect(list.map((p) => p.category.podiumSize)).toEqual([3, 5]);
+  });
+
+  it("masculino premia 3 e feminino premia 5", () => {
+    const many = [
+      ...Array.from({ length: 6 }, (_, i) => athlete(100 + i, `Homem ${i}`, 30, "M")),
+      ...Array.from({ length: 7 }, (_, i) => athlete(200 + i, `Mulher ${i}`, 30, "F")),
+    ];
+    const r = buildResults(race, many, many.map((a, i) => finish(a.id, 700 + i)));
+    const [m, f] = podiums(r.rows);
+    expect(m.winners.map((w) => w.athlete.bib_number)).toEqual([100, 101, 102]);
+    expect(f.winners.map((w) => w.athlete.bib_number)).toEqual([200, 201, 202, 203, 204]);
+  });
+
+  it("com menos atletas que vagas, o pódio fica incompleto", () => {
+    const [m, f] = podiums(rows);
+    expect(m.winners.map((w) => w.athlete.bib_number)).toEqual([10, 11]);
+    expect(f.winners.map((w) => w.athlete.bib_number)).toEqual([1, 2, 3, 4]);
   });
 });
 
