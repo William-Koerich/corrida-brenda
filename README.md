@@ -15,6 +15,7 @@ Aplicação web (PWA, mobile-first) para cronometrar corridas de rua, com classi
 | `/chegada`    | Registro de chegadas no celular (botão CHEGOU, QR Code) |
 | `/resultados` | Classificação em tempo real, premiação e exportação CSV |
 | `/telao`      | Modo telão para TV: fonte grande e rolagem automática   |
+| `/meu-resultado` | Área pública dos corredores: busca, resultado e compartilhamento |
 
 ## 1. Configurar o Supabase
 
@@ -187,6 +188,21 @@ Cálculos (funções puras com testes em `lib/*.test.ts`, rode `npm test`):
 - tempo_total = `finish_time − start_time`;
 - ritmo = tempo_total ÷ distância, exibido como `m:ss /km`;
 - empate no tempo é desempatado pelo número de peito.
+
+## Área dos corredores
+
+`/meu-resultado` é a área **pública**, para os corredores. Ela não mostra o menu de gestão (atletas, largada, chegada).
+
+- Em `/resultados`, o botão **Link para corredores** mostra o endereço e um **QR Code**, para copiar, abrir ou baixar e imprimir na área de chegada.
+- **Busca** por nome (sem acento, em qualquer ordem) ou por número do peito. A lista mostra todos os inscritos: quem chegou em ordem de classificação, quem ainda não chegou no fim.
+- **`/meu-resultado/<número>`**: tempo, ritmo, posição geral e no sexo, e selo de pódio para os premiados. Cada corredor tem um link próprio.
+- **Compartilhar:** a imagem do resultado é gerada no próprio celular, em dois formatos:
+  - **Story** (1080×1920), para o Instagram;
+  - **Quadrado** (1080×1080), para o feed e o Strava.
+
+  O botão **Compartilhar** abre o menu do celular (Instagram, Strava, WhatsApp…). Se o aparelho não tiver esse menu, a imagem é baixada.
+- **Strava:** o Strava não aceita publicação direta por site sem integração com login da conta. O corredor salva a imagem e adiciona como foto da atividade.
+- A página atualiza em tempo real: quem acabou de chegar já encontra o resultado.
 
 ## Telão
 

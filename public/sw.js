@@ -3,10 +3,10 @@
 // - páginas: rede primeiro; sem internet, a última versão guardada
 // - Supabase e outros domínios: não passam por aqui (a fila offline cuida disso)
 
-const VERSION = "v3";
+const VERSION = "v4";
 const STATIC_CACHE = `static-${VERSION}`;
 const PAGES_CACHE = `pages-${VERSION}`;
-const ROUTES = ["/", "/chegada", "/largada", "/resultados", "/atletas", "/telao"];
+const ROUTES = ["/", "/chegada", "/largada", "/resultados", "/atletas", "/telao", "/meu-resultado"];
 const NAV_TIMEOUT_MS = 4000;
 
 self.addEventListener("install", (event) => {

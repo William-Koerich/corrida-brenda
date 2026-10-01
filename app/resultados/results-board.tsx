@@ -11,6 +11,7 @@ import { buildResults, filterResults, podiums, resultsToCsv, type SexFilter } fr
 import { formatDuration, formatPace } from "@/lib/time";
 import type { Race } from "@/lib/types";
 import { useAthletes, useFinishes } from "@/lib/use-race-data";
+import { PublicLinkButton } from "./public-link";
 import { UnidentifiedList } from "./unidentified-list";
 
 type Tab = "classificacao" | "premiacao";
@@ -73,6 +74,7 @@ export function ResultsBoard({ race }: { race: Race }) {
         }
         actions={
           <>
+            <PublicLinkButton />
             <ButtonLink href="/telao" icon={<Monitor size={16} />}>
               Modo telão
             </ButtonLink>

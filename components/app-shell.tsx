@@ -47,6 +47,25 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   if (pathname.startsWith("/telao")) return <>{children}</>;
+  if (pathname.startsWith("/meu-resultado")) {
+    // área pública dos corredores: só a marca, sem o menu de gestão
+    return (
+      <div className="flex min-h-dvh flex-col">
+        <header className="border-b border-line bg-white/85 backdrop-blur">
+          <div className="mx-auto flex h-16 w-full max-w-2xl items-center justify-between px-4">
+            <Link href="/meu-resultado" className="flex items-center gap-2.5">
+              <span className="flex size-9 items-center justify-center rounded-xl bg-brand text-ink shadow-sm">
+                <Flag size={18} strokeWidth={2.5} />
+              </span>
+              <span className="text-[15px] font-semibold tracking-tight">{BRAND.name}</span>
+            </Link>
+            <StatusPill />
+          </div>
+        </header>
+        <main className="mx-auto w-full max-w-2xl flex-1 px-4 pt-6 pb-12">{children}</main>
+      </div>
+    );
+  }
   if (pathname.startsWith("/chegada")) {
     return <main className="mx-auto flex min-h-dvh w-full max-w-xl flex-col px-3 pt-3 pb-6">{children}</main>;
   }

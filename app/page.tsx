@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Flag, Monitor, Timer, Trophy, Users } from "lucide-react";
+import { ArrowRight, Flag, Monitor, Share2, Timer, Trophy, Users } from "lucide-react";
 import Link from "next/link";
 import { RaceGate } from "@/components/app-shell";
 import { RaceStatusBadge } from "@/components/ui/badge";
@@ -19,6 +19,7 @@ const STEPS = [
   { href: "/chegada", icon: Timer, title: "Chegada", text: "Registre as chegadas no celular, até sem internet." },
   { href: "/resultados", icon: Trophy, title: "Resultados", text: "Classificação ao vivo, pódios e exportação." },
   { href: "/telao", icon: Monitor, title: "Telão", text: "Classificação em tela cheia para TV ou projetor." },
+  { href: "/meu-resultado", icon: Share2, title: "Para corredores", text: "Busca por nome ou número e imagem para compartilhar." },
 ];
 
 export default function Home() {
