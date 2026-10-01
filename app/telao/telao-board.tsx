@@ -110,6 +110,7 @@ export function TelaoBoard({ race }: { race: Race }) {
                 </span>
               )}
               {race.status === "finished" && <span className="text-gold">Resultado final</span>}
+              {race.status !== "not_started" && <span className="text-white/25">·</span>}
               <span>{distance.toLocaleString("pt-BR")} km</span>
               {!status.online && <span className="text-gold">· sem conexão</span>}
             </p>

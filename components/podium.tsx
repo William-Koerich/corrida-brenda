@@ -43,7 +43,7 @@ export function Podium({ podium, tv = false }: { podium: PodiumData; tv?: boolea
               {w ? (
                 <div className="w-full min-w-0 px-0.5" title={w.athlete.name}>
                   <p
-                    className={`font-semibold ${compact ? "line-clamp-2 leading-tight break-words" : "truncate"} ${
+                    className={`font-semibold ${compact || tv ? "line-clamp-2 leading-tight break-words" : "truncate"} ${
                       tv ? (compact ? "text-[1.5vw] text-white" : "text-[2vw] text-white") : compact ? "text-xs" : "text-sm"
                     }`}
                   >
