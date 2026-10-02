@@ -45,3 +45,6 @@ next-env.d.ts
 
 # certificados do next dev --experimental-https
 /certificates
+
+# material de divulgação (imagens grandes, fora do repositório)
+/divulgacao

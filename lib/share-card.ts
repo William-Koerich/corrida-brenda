@@ -182,9 +182,11 @@ export async function renderResultCard(data: CardData, format: CardFormat): Prom
   ctx.fillStyle = COLORS.white;
   fitText(ctx, data.name, pad, y, w - pad * 2, story ? 88 : 68, (s) => `700 ${s}px ${sans}`);
 
-  ctx.font = `500 ${story ? 30 : 26}px ${sans}`;
-  ctx.fillStyle = "rgba(255,255,255,0.4)";
-  ctx.fillText(data.url, pad, story ? h - 260 : h - 56);
+  if (data.url) {
+    ctx.font = `500 ${story ? 30 : 26}px ${sans}`;
+    ctx.fillStyle = "rgba(255,255,255,0.4)";
+    ctx.fillText(data.url, pad, story ? h - 260 : h - 56);
+  }
 
   return new Promise((resolve, reject) =>
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Falha ao gerar a imagem"))), "image/png"),

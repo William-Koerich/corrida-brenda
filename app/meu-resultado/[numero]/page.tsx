@@ -84,7 +84,7 @@ function ResultView({ race, entry, totalFinishers }: { race: Race; entry: Runner
       sexPosition: entry.sexPosition!,
       sexFinishers: entry.sexFinishers,
       prize: entry.prize,
-      url: typeof window === "undefined" ? "" : `${window.location.host}/meu-resultado/${athlete.bib_number}`,
+      url: publicUrl(athlete.bib_number),
     }),
     [race, distance, athlete, time, pace, row.overall, totalFinishers, sexLabel, entry],
   );
@@ -210,6 +210,14 @@ function ResultView({ race, entry, totalFinishers }: { race: Race; entry: Runner
       </Card>
     </>
   );
+}
+
+/** Endereço impresso na imagem; omitido em endereços locais, que não funcionam para quem vê o post. */
+function publicUrl(bib: number): string {
+  if (typeof window === "undefined") return "";
+  const host = window.location.host;
+  const local = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[::1\])/.test(host);
+  return local ? "" : `${host}/meu-resultado/${bib}`;
 }
 
 function Position({ title, pos, total }: { title: string; pos: number; total: number }) {

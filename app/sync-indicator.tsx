@@ -4,13 +4,19 @@ import { CloudOff, CloudUpload, Wifi } from "lucide-react";
 import type { ReactNode } from "react";
 import type { SyncStatus } from "@/lib/use-race-data";
 
-function describe({ online, pending, syncing }: SyncStatus) {
-  const pendingText = `${pending} ${pending === 1 ? "pendente" : "pendentes"} de envio`;
+function describe({ online, pending, syncing }: SyncStatus): { tone: string; icon: ReactNode; text: ReactNode } {
+  // no celular o "de envio" some da tela (continua para leitores de tela) para caber ao lado do cronômetro
+  const pendingText = (
+    <>
+      {pending} {pending === 1 ? "pendente" : "pendentes"}
+      <span className="max-sm:sr-only"> de envio</span>
+    </>
+  );
   if (!online) {
-    return { tone: "bg-red-600 text-white", icon: <CloudOff size={16} />, text: pending ? `Offline · ${pendingText}` : "Offline" };
+    return { tone: "bg-red-600 text-white", icon: <CloudOff size={16} />, text: pending ? <>Offline · {pendingText}</> : "Offline" };
   }
   if (pending) {
-    return { tone: "bg-amber-400 text-ink", icon: <CloudUpload size={16} />, text: `${syncing ? "Enviando" : "Online"} · ${pendingText}` };
+    return { tone: "bg-amber-400 text-ink", icon: <CloudUpload size={16} />, text: <>{syncing ? "Enviando" : "Online"} · {pendingText}</> };
   }
   return { tone: "bg-ink text-white", icon: <Wifi size={16} className="text-brand" />, text: "Online" };
 }
@@ -20,9 +26,9 @@ export function SyncBar({ status, children }: { status: SyncStatus; children?: R
   const { tone, icon, text } = describe(status);
   return (
     <div className={`flex items-center justify-between gap-2 rounded-2xl px-4 py-2.5 transition-colors ${tone}`}>
-      <span role="status" data-testid="sync-status" className="flex min-w-0 items-center gap-2 truncate text-sm font-semibold">
-        {icon}
-        {text}
+      <span role="status" data-testid="sync-status" className="flex min-w-0 items-center gap-2 text-sm font-semibold">
+        <span className="shrink-0">{icon}</span>
+        <span className="truncate">{text}</span>
       </span>
       {children}
     </div>
