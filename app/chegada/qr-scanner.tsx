@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import jsQR from "jsqr";
+import { useEffect, useRef, useState } from "react";
 import { cameraErrorMessage, parseBibFromQr, ScanDebouncer } from "@/lib/qr";
 
 type Status = { kind: "starting" } | { kind: "running" } | { kind: "error"; message: string };
@@ -10,9 +11,52 @@ interface Props {
   onInvalid: (text: string) => void;
 }
 
+/** Intervalo mínimo entre leituras (o decodificador em JS no iPhone leva mais tempo por quadro). */
+const SCAN_EVERY_MS = 120;
+
+interface Detector {
+  detect(source: HTMLVideoElement): Promise<string[]>;
+}
+
+/**
+ * Leitor nativo do aparelho (Android/Chrome); no iPhone, jsQR.
+ * Os dois analisam a imagem na resolução real da câmera: o QR do número de
+ * peito é pequeno quando o corredor está longe, e reduzir a imagem antes de
+ * procurar (como fazia a biblioteca anterior) impedia a leitura.
+ */
+async function createDetector(): Promise<Detector> {
+  type NativeDetector = { detect(s: HTMLVideoElement): Promise<{ rawValue: string }[]> };
+  const Native = (globalThis as { BarcodeDetector?: new (o: { formats: string[] }) => NativeDetector }).BarcodeDetector;
+  if (Native) {
+    try {
+      const native = new Native({ formats: ["qr_code"] });
+      return { detect: async (video) => (await native.detect(video)).map((c) => c.rawValue) };
+    } catch {
+      // aparelho sem suporte a QR no leitor nativo: usa o jsQR
+    }
+  }
+
+  // jsQR vem junto com a tela (não sob demanda): precisa funcionar offline no iPhone
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+  return {
+    detect: async (video) => {
+      const { videoWidth: w, videoHeight: h } = video;
+      if (!w || !h) return [];
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+      ctx.drawImage(video, 0, 0, w, h);
+      const found = jsQR(ctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: "dontInvert" });
+      return found ? [found.data] : [];
+    },
+  };
+}
+
 /** Câmera traseira lendo QR Codes continuamente. */
 export function QrScanner({ onScan, onInvalid }: Props) {
-  const elementId = `qr-${useId().replace(/[^a-zA-Z0-9-]/g, "")}`;
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [status, setStatus] = useState<Status>({ kind: "starting" });
   const [attempt, setAttempt] = useState(0);
   const callbacks = useRef({ onScan, onInvalid });
@@ -28,37 +72,46 @@ export function QrScanner({ onScan, onInvalid }: Props) {
     }
 
     let cancelled = false;
-    let scanner: import("html5-qrcode").Html5Qrcode | null = null;
+    let stream: MediaStream | null = null;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const debouncer = new ScanDebouncer();
 
     (async () => {
-      const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import("html5-qrcode");
-      if (cancelled) return;
-      scanner = new Html5Qrcode(elementId, {
-        verbose: false,
-        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-        useBarCodeDetectorIfSupported: true,
-      });
       try {
-        await scanner.start(
-          { facingMode: "environment" },
-          {
-            fps: 15,
-            qrbox: (w, h) => {
-              const size = Math.floor(Math.min(w, h) * 0.75);
-              return { width: size, height: size };
-            },
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            facingMode: "environment",
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            // foco contínuo onde o aparelho permite (Android)
+            advanced: [{ focusMode: "continuous" } as MediaTrackConstraintSet],
           },
-          (text) => {
-            if (!debouncer.accept(text)) return;
-            const bib = parseBibFromQr(text);
-            if (bib) callbacks.current.onScan(bib);
-            else callbacks.current.onInvalid(text);
-          },
-          undefined,
-        );
-        if (cancelled) await scanner.stop();
-        else setStatus({ kind: "running" });
+        });
+        if (cancelled) return;
+        const video = videoRef.current!;
+        video.srcObject = stream;
+        await video.play();
+        const detector = await createDetector();
+        if (cancelled) return;
+        setStatus({ kind: "running" });
+
+        const loop = async () => {
+          if (cancelled) return;
+          const started = performance.now();
+          try {
+            for (const text of await detector.detect(video)) {
+              if (!debouncer.accept(text)) continue;
+              const bib = parseBibFromQr(text);
+              if (bib) callbacks.current.onScan(bib);
+              else callbacks.current.onInvalid(text);
+            }
+          } catch {
+            // quadro inválido (câmera trocando de resolução etc.): tenta no próximo
+          }
+          timer = setTimeout(loop, Math.max(0, SCAN_EVERY_MS - (performance.now() - started)));
+        };
+        loop();
       } catch (e) {
         if (!cancelled) setStatus({ kind: "error", message: cameraErrorMessage(e) });
       }
@@ -66,16 +119,25 @@ export function QrScanner({ onScan, onInvalid }: Props) {
 
     return () => {
       cancelled = true;
-      if (scanner?.isScanning) scanner.stop().catch(() => {});
+      clearTimeout(timer);
+      stream?.getTracks().forEach((t) => t.stop());
     };
-  }, [elementId, attempt]);
+  }, [attempt]);
 
   return (
     <div className="relative flex flex-col gap-2">
-      <div
-        id={elementId}
-        className="aspect-[4/3] w-full overflow-hidden rounded-2xl bg-ink [&_video]:!h-full [&_video]:!w-full [&_video]:object-cover"
-      />
+      <div className="aspect-4/3 w-full overflow-hidden rounded-2xl bg-ink">
+        <video ref={videoRef} playsInline muted className="h-full w-full object-cover" />
+      </div>
+      {status.kind === "running" && (
+        // só orientação: a leitura usa a imagem inteira
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-end p-3">
+          <div className="absolute inset-[12%] rounded-2xl border-2 border-dashed border-white/50" />
+          <p className="relative rounded-full bg-ink/70 px-3 py-1 text-xs font-medium text-white">
+            Enquadre o número de peito inteiro
+          </p>
+        </div>
+      )}
       {status.kind === "starting" && (
         <p className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-lg font-bold text-white">
           Abrindo câmera…

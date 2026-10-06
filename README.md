@@ -106,6 +106,14 @@ Há um exemplo com 20 atletas em `exemplos/atletas-exemplo.csv`.
 
 O botão **Gerar números de peito (PDF)** cria uma página A5 (paisagem) por atleta, em ordem de número. Cada página tem o número grande, o nome do atleta e um QR Code que contém **apenas o número**.
 
+Como o QR foi pensado para ser lido de longe:
+
+- **50 mm, centralizado embaixo:** longe dos cantos, onde ficam os alfinetes e o papel dobra.
+- **Espaço branco livre em volta:** mais de 4 módulos, como pede o padrão QR.
+- **Correção de erro máxima (H):** o número é curto, então o código continua com 21×21 módulos e aguenta cerca de 30% de dano (suor, dobra, furo).
+
+Imprima em papel branco fosco: papel brilhante reflete a luz do sol e atrapalha a leitura.
+
 ## Largada
 
 Em `/largada`, o botão **DAR LARGADA** pede confirmação e chama a RPC `start_race`. O `start_time` é gravado com o `now()` do **servidor**, nunca com o relógio do aparelho.
@@ -142,6 +150,10 @@ Todo `finish_time` é o relógio do celular mais a diferença medida em relaçã
 ### Leitura por QR Code
 
 Na chave **Teclado | Câmera (QR)**, a opção Câmera abre a câmera traseira. Ela lê sem parar, e cada número lido segue as mesmas regras da digitação.
+
+- A leitura usa a **imagem inteira, na resolução real da câmera** (Full HD quando o aparelho permite), com foco contínuo no Android.
+- **Leitor nativo do aparelho** (`BarcodeDetector`) no Android e no Chrome; **jsQR** no iPhone. O jsQR vai junto com a tela de chegada, então funciona offline.
+- Em testes com a câmera simulada filmando o número de peito impresso, o QR foi lido do peito preenchendo a tela até o peito ocupando 18% da altura da imagem (corredor a uns 2 metros), em menos de meio segundo.
 
 - O mesmo QR é aceito uma vez a cada 4 segundos, para o atleta parado na frente da câmera não gerar várias leituras.
 - Se a câmera ler de novo um peito que este celular acabou de registrar, aparece um aviso neutro ("já registrado"), sem alarme.

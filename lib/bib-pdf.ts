@@ -6,7 +6,11 @@ import type { Athlete } from "./types";
 const PAGE_W = 210;
 const PAGE_H = 148;
 const MARGIN = 10;
-const QR_SIZE = 48;
+/** QR do número (sem margem na imagem: o papel branco em volta é a margem). */
+const QR_SIZE = 50;
+/** Espaço livre em volta do QR (mais de 4 módulos, como pede o padrão) e longe dos alfinetes. */
+const QR_CLEAR = 10;
+const QR_BOTTOM = 12;
 const PT_TO_MM = 25.4 / 72;
 // altura das maiúsculas/dígitos da Helvetica em relação ao tamanho da fonte
 const CAP_HEIGHT = 0.72;
@@ -32,9 +36,13 @@ export async function buildBibsPdf(athletes: Athlete[], raceName: string) {
 async function drawBib(doc: jsPDF, athlete: Athlete, raceName: string) {
   const number = String(athlete.bib_number);
 
-  // número: o maior possível na área acima do rodapé
+  // QR centralizado embaixo: longe dos cantos, onde ficam os alfinetes e o papel dobra
+  const qrX = (PAGE_W - QR_SIZE) / 2;
+  const qrY = PAGE_H - QR_BOTTOM - QR_SIZE;
+
+  // número: o maior possível acima do QR, sem invadir o espaço livre dele
   const numberAreaTop = MARGIN + 8;
-  const numberAreaH = PAGE_H - MARGIN - QR_SIZE - 6 - numberAreaTop;
+  const numberAreaH = qrY - QR_CLEAR - numberAreaTop;
   const maxW = PAGE_W - 2 * MARGIN;
 
   doc.setFont("helvetica", "bold");
@@ -53,18 +61,18 @@ async function drawBib(doc: jsPDF, athlete: Athlete, raceName: string) {
   doc.setFontSize(12);
   doc.text(raceName, PAGE_W / 2, MARGIN + 3, { align: "center" });
 
-  // rodapé: nome do atleta à esquerda, QR Code à direita
-  const qrX = PAGE_W - MARGIN - QR_SIZE;
-  const qrY = PAGE_H - MARGIN - QR_SIZE;
+  // correção de erro máxima (H): o número é curto, então o QR continua com 21×21 módulos
+  // e aguenta ~30% de dano (suor, dobra, furo de alfinete)
   const qr = await QRCode.toDataURL(number, {
-    errorCorrectionLevel: "M",
-    margin: 1,
-    width: 400,
+    errorCorrectionLevel: "H",
+    margin: 0,
+    width: 21 * 20, // 20 px por módulo: bordas nítidas na impressão
   });
   doc.addImage(qr, "PNG", qrX, qrY, QR_SIZE, QR_SIZE);
 
+  // nome do atleta embaixo, à esquerda, fora do espaço livre do QR
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
-  const nameLines = doc.splitTextToSize(athlete.name, qrX - MARGIN - 6) as string[];
-  doc.text(nameLines.slice(0, 2), MARGIN, PAGE_H - MARGIN - 8);
+  doc.setFontSize(14);
+  const nameLines = doc.splitTextToSize(athlete.name, qrX - QR_CLEAR - MARGIN) as string[];
+  doc.text(nameLines.slice(0, 2), MARGIN, PAGE_H - QR_BOTTOM - (nameLines.length > 1 ? 6 : 0));
 }
