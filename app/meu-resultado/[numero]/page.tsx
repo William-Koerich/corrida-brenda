@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { RaceGate } from "@/components/app-shell";
+import { LiveIndicator } from "@/components/live-indicator";
 import { Button } from "@/components/ui/button";
 import { Card, EmptyState } from "@/components/ui/card";
 import { Segmented } from "@/components/ui/segmented";
@@ -22,7 +23,7 @@ export default function RunnerResultPage() {
 }
 
 function RunnerResult({ race, bib }: { race: Race; bib: number }) {
-  const { entries, totalFinishers, loaded } = useRunners(race);
+  const { entries, totalFinishers, loaded, status } = useRunners(race);
   const entry = entries.find((e) => e.athlete.bib_number === bib);
 
   return (
@@ -48,6 +49,7 @@ function RunnerResult({ race, bib }: { race: Race; bib: number }) {
               ? "A corrida ainda não começou. Boa prova!"
               : "Ainda não registramos a sua chegada. O resultado aparece aqui assim que você cruzar a linha."}
           </p>
+          <LiveIndicator status={status} className="mt-4" />
         </Card>
       ) : (
         <ResultView race={race} entry={entry} totalFinishers={totalFinishers} />

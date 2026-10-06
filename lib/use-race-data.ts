@@ -1,14 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { maxUpdatedAt, mergeByKey, needsFullReload, sinceWithOverlap } from "./delta-sync";
 import { friendlyError, isNetworkError } from "./errors";
 import { fetchFinishes, pushOp } from "./finishes";
 import { cacheGet, cacheSet, outboxAdd, outboxAll, outboxDelete } from "./local-db";
 import { applyOp, applyOutbox, pendingCount, type OutboxOp } from "./outbox";
 import { getSupabase } from "./supabase";
+import { countRows, fetchChangedRows } from "./table-sync";
 import type { Athlete, Finish } from "./types";
+import { useLiveRefresh } from "./use-live-refresh";
 
 const RETRY_MS = 10_000;
+/** De quanto em quanto tempo as telas conferem o servidor (além do tempo real). */
+export const DEFAULT_LIVE_MS = 5_000;
+const ATHLETES_LIVE_MS = 15_000;
 
 // um único envio por vez nesta aba, mesmo com mais de um hook montado
 let flushing = false;
@@ -18,18 +24,53 @@ export interface SyncStatus {
   /** chegadas com alterações ainda não enviadas */
   pending: number;
   syncing: boolean;
+  /** quando a tela conferiu o servidor com sucesso pela última vez (Date.now()) */
+  lastSync: number | null;
+}
+
+/**
+ * Executa `run` sem sobrepor chamadas: se pedirem de novo enquanto roda,
+ * roda mais uma vez no final (vários avisos seguidos viram uma consulta só).
+ */
+function useSerialized(run: () => Promise<void>) {
+  const busy = useRef(false);
+  const again = useRef(false);
+  const runRef = useRef(run);
+  useEffect(() => {
+    runRef.current = run;
+  });
+  return useCallback(async () => {
+    if (busy.current) {
+      again.current = true;
+      return;
+    }
+    busy.current = true;
+    try {
+      do {
+        again.current = false;
+        await runRef.current();
+      } while (again.current);
+    } finally {
+      busy.current = false;
+    }
+  }, []);
 }
 
 /**
  * Chegadas da corrida, offline-first: toda ação vai primeiro para a fila
  * no IndexedDB e aparece na hora; a fila é enviada em ordem quando há
  * conexão. A tela mostra o último estado do servidor + a fila por cima.
+ *
+ * O servidor é conferido pelo tempo real e também a cada `liveMs`
+ * (a conexão em tempo real cai e perde avisos), buscando só o que mudou.
  */
-export function useFinishes(raceId: string, onError: (message: string) => void) {
+export function useFinishes(raceId: string, onError: (message: string) => void, { liveMs = DEFAULT_LIVE_MS } = {}) {
   const [server, setServer] = useState<Finish[]>([]);
+  const serverRef = useRef<Finish[]>([]);
   const [outbox, setOutbox] = useState<OutboxOp[]>([]);
   const [online, setOnline] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [lastSync, setLastSync] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const cacheKey = `finishes:${raceId}`;
   const onErrorRef = useRef(onError);
@@ -37,18 +78,33 @@ export function useFinishes(raceId: string, onError: (message: string) => void) 
     onErrorRef.current = onError;
   });
 
-  const reload = useCallback(async () => {
+  const commit = useCallback((next: Finish[]) => {
+    serverRef.current = next;
+    setServer(next);
+  }, []);
+
+  /** Busca só as chegadas novas/alteradas; recarrega tudo se algo foi excluído. */
+  const reload = useSerialized(async () => {
     try {
-      const data = await fetchFinishes(raceId);
-      setServer(data);
+      const since = sinceWithOverlap(maxUpdatedAt(serverRef.current));
+      const [changed, total] = await Promise.all([
+        fetchChangedRows<Finish>("finishes", raceId, since),
+        countRows("finishes", raceId),
+      ]);
+      let next = since === null ? changed : mergeByKey(serverRef.current, changed, (f) => f.client_id);
+      if (needsFullReload(next.length, total)) next = await fetchFinishes(raceId);
+      if (next !== serverRef.current) {
+        commit(next);
+        await cacheSet(cacheKey, next);
+      }
       setOnline(true);
       setLoadError(null);
-      await cacheSet(cacheKey, data);
+      setLastSync(Date.now());
     } catch (e) {
       if (isNetworkError(e)) setOnline(false);
       else setLoadError(friendlyError(e));
     }
-  }, [raceId, cacheKey]);
+  });
 
   const flush = useCallback(async () => {
     if (flushing) return;
@@ -66,7 +122,7 @@ export function useFinishes(raceId: string, onError: (message: string) => void) 
         if (result.kind === "conflict") onErrorRef.current(result.message);
         await outboxDelete(op.seq!);
         const applied = result.applied;
-        if (applied) setServer((prev) => applyOp(prev, applied));
+        if (applied) commit(applyOp(serverRef.current, applied));
         setOutbox((prev) => prev.filter((o) => o.seq !== op.seq));
         setOnline(true);
       }
@@ -74,7 +130,7 @@ export function useFinishes(raceId: string, onError: (message: string) => void) 
       flushing = false;
       setSyncing(false);
     }
-  }, []);
+  }, [commit]);
 
   useEffect(() => {
     let active = true;
@@ -82,7 +138,7 @@ export function useFinishes(raceId: string, onError: (message: string) => void) 
       // primeiro o que está no aparelho (funciona sem internet)
       const [cached, ops] = await Promise.all([cacheGet<Finish[]>(cacheKey), outboxAll()]);
       if (!active) return;
-      if (cached) setServer(cached);
+      if (cached) commit(cached);
       setOutbox(ops);
       await flush();
       await reload();
@@ -110,9 +166,12 @@ export function useFinishes(raceId: string, onError: (message: string) => void) 
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
     };
-  }, [cacheKey, flush, reload]);
+  }, [cacheKey, commit, flush, reload]);
 
-  // Wi-Fi sem internet não dispara "online": tenta de novo periodicamente
+  // conferência periódica: cobre avisos perdidos pelo tempo real
+  useLiveRefresh(reload, liveMs);
+
+  // Wi-Fi sem internet não dispara "online": tenta enviar a fila periodicamente
   useEffect(() => {
     if (online && outbox.length === 0) return;
     const id = setInterval(async () => {
@@ -143,61 +202,74 @@ export function useFinishes(raceId: string, onError: (message: string) => void) 
     () => applyOutbox(server, outbox.filter((op) => op.type !== "insert" || op.finish.race_id === raceId)),
     [server, outbox, raceId],
   );
-  const status: SyncStatus = { online, pending: pendingCount(outbox), syncing };
+  const status: SyncStatus = { online, pending: pendingCount(outbox), syncing, lastSync };
 
   return { finishes, loadError, status, reload, add, assign, remove };
 }
 
 /** Atletas da corrida, com cópia no aparelho para reconhecer números sem internet. */
-export function useAthletes(raceId: string) {
+export function useAthletes(raceId: string, { liveMs = ATHLETES_LIVE_MS } = {}) {
   const [byBib, setByBib] = useState<Map<number, Athlete>>(new Map());
   const [error, setError] = useState<string | null>(null);
+  const list = useRef<Athlete[]>([]);
   const current = useRef(byBib);
   const cacheKey = `athletes:${raceId}`;
 
-  const apply = useCallback((list: Athlete[]) => {
-    const map = new Map(list.map((a) => [a.bib_number, a]));
+  const apply = useCallback((next: Athlete[]) => {
+    list.current = next;
+    const map = new Map(next.map((a) => [a.bib_number, a]));
     current.current = map;
     setByBib(map);
     return map;
   }, []);
 
+  const sync = useSerialized(async () => {
+    // sem internet nem tenta: segue com a cópia local
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+    try {
+      const since = sinceWithOverlap(maxUpdatedAt(list.current));
+      const [changed, total] = await Promise.all([
+        fetchChangedRows<Athlete>("athletes", raceId, since),
+        countRows("athletes", raceId),
+      ]);
+      let next = since === null ? changed : mergeByKey(list.current, changed, (a) => a.id);
+      if (needsFullReload(next.length, total)) next = await fetchChangedRows<Athlete>("athletes", raceId, null);
+      setError(null);
+      if (next !== list.current) {
+        apply(next);
+        await cacheSet(cacheKey, next);
+      }
+    } catch (e) {
+      if (!isNetworkError(e)) setError(friendlyError(e));
+    }
+  });
+
   /** Recarrega e devolve o mapa novo (para checar número recém-cadastrado). */
   const reload = useCallback(async (): Promise<Map<number, Athlete>> => {
-    // sem internet nem tenta: responde na hora com a cópia local
-    if (typeof navigator !== "undefined" && navigator.onLine === false) return current.current;
-    const { data, error } = await getSupabase().from("athletes").select("*").eq("race_id", raceId);
-    if (error) {
-      // sem internet: segue com a cópia local
-      if (!isNetworkError(error)) setError(friendlyError(error));
-      return current.current;
-    }
-    setError(null);
-    await cacheSet(cacheKey, data);
-    return apply(data as Athlete[]);
-  }, [raceId, cacheKey, apply]);
+    await sync();
+    return current.current;
+  }, [sync]);
 
   useEffect(() => {
     let active = true;
     cacheGet<Athlete[]>(cacheKey).then((cached) => {
-      if (active && cached && current.current.size === 0) apply(cached);
+      if (active && cached && list.current.length === 0) apply(cached);
     });
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial assíncrona
-    reload();
+    sync();
     const supabase = getSupabase();
     const channel = supabase
       .channel(`athletes-${crypto.randomUUID()}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "athletes" }, () => {
-        reload();
+        sync();
       })
       .subscribe();
-    window.addEventListener("online", reload);
     return () => {
       active = false;
       supabase.removeChannel(channel);
-      window.removeEventListener("online", reload);
     };
-  }, [cacheKey, reload, apply]);
+  }, [cacheKey, sync, apply]);
+
+  useLiveRefresh(sync, liveMs);
 
   return { byBib, error, reload };
 }

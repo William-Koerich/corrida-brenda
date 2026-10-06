@@ -12,6 +12,7 @@ import { formatDuration, formatPace } from "@/lib/time";
 import type { Race } from "@/lib/types";
 import { useAthletes, useFinishes } from "@/lib/use-race-data";
 import { PublicLinkButton } from "./public-link";
+import { LiveIndicator } from "@/components/live-indicator";
 import { UnidentifiedList } from "./unidentified-list";
 
 type Tab = "classificacao" | "premiacao";
@@ -63,13 +64,8 @@ export function ResultsBoard({ race }: { race: Race }) {
         description={
           <span className="flex flex-wrap items-center gap-2">
             {race.name} · {rows.length} classificados
-            {race.status === "running" && syncStatus.online && (
-              <Badge tone="success" dot>
-                Ao vivo
-              </Badge>
-            )}
             {race.status === "finished" && <Badge tone="dark">Resultado final</Badge>}
-            {!syncStatus.online && <Badge tone="danger">Offline · pode estar desatualizado</Badge>}
+            <LiveIndicator status={syncStatus} />
           </span>
         }
         actions={

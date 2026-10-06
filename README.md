@@ -189,6 +189,25 @@ Cálculos (funções puras com testes em `lib/*.test.ts`, rode `npm test`):
 - ritmo = tempo_total ÷ distância, exibido como `m:ss /km`;
 - empate no tempo é desempatado pelo número de peito.
 
+## Atualização automática
+
+Nenhuma tela precisa ser recarregada. Cada uma se mantém atualizada de dois jeitos:
+
+1. **Tempo real (Supabase Realtime):** o servidor avisa na hora quando algo muda.
+2. **Conferência periódica:** a tela também consulta o servidor de tempos em tempos. Isso cobre os avisos perdidos quando a conexão em tempo real cai (TV que apagou, celular bloqueado, Wi-Fi oscilando).
+
+| Tela | Conferência |
+|---|---|
+| Telão | a cada 3 s |
+| Resultados, área dos corredores, chegada | a cada 5 s |
+| Atletas (nomes) | a cada 15 s |
+| Corrida (largada/encerramento) | a cada 10 s |
+
+- A conferência só acontece com a tela visível, e roda na hora quando ela volta a ficar visível ou a internet volta.
+- **Busca só o que mudou** (coluna `updated_at`), não a lista inteira. Sem mudanças, cada consulta tem poucas centenas de bytes, contra dezenas de KB da lista completa. Isso importa com centenas de corredores olhando o resultado no celular, por causa da franquia de tráfego do Supabase. Exclusões são detectadas pela contagem total.
+- O indicador **"Ao vivo · atualizado há X s"** aparece em Resultados, no telão e na área dos corredores. Ele fica amarelo se passar de 20 s sem conseguir atualizar e vermelho sem internet.
+- Uma falha passageira do servidor não apaga a tela: ela mantém o último resultado bom e tenta de novo.
+
 ## Área dos corredores
 
 `/meu-resultado` é a área **pública**, para os corredores. Ela não mostra o menu de gestão (atletas, largada, chegada).

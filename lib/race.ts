@@ -5,6 +5,9 @@ import { friendlyError, isNetworkError } from "./errors";
 import { cacheGet, cacheSet } from "./local-db";
 import { getSupabase, isSupabaseConfigured } from "./supabase";
 import type { Race } from "./types";
+import { useLiveRefresh } from "./use-live-refresh";
+
+const RACE_LIVE_MS = 10_000;
 
 type RaceState =
   | { status: "loading" }
@@ -29,13 +32,25 @@ export function useCurrentRace() {
       .limit(1)
       .maybeSingle<Race>();
     if (error) {
-      // sem internet: usa a última corrida vista neste aparelho
+      // falha passageira com a corrida já na tela: mantém o que está (o telão não pode apagar)
+      // sem internet na abertura: usa a última corrida vista neste aparelho
       const cached = isNetworkError(error) ? await cacheGet<Race>("race") : undefined;
-      setState(cached ? { status: "ready", race: cached } : { status: "error", message: friendlyError(error) });
+      setState((prev) =>
+        prev.status === "ready"
+          ? prev
+          : cached
+            ? { status: "ready", race: cached }
+            : { status: "error", message: friendlyError(error) },
+      );
       return;
     }
     if (data) await cacheSet("race", data);
-    setState(data ? { status: "ready", race: data } : { status: "empty" });
+    // só troca o estado se algo mudou (evita redesenhar as telas a cada conferência)
+    setState((prev) => {
+      if (!data) return prev.status === "empty" ? prev : { status: "empty" };
+      if (prev.status === "ready" && JSON.stringify(prev.race) === JSON.stringify(data)) return prev;
+      return { status: "ready", race: data };
+    });
   }, []);
 
   useEffect(() => {
@@ -55,6 +70,9 @@ export function useCurrentRace() {
       supabase.removeChannel(channel);
     };
   }, [reload]);
+
+  // conferência periódica: largada/encerramento chegam mesmo se o tempo real caiu
+  useLiveRefresh(reload, RACE_LIVE_MS);
 
   return { ...state, reload };
 }

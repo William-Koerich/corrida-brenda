@@ -3,6 +3,7 @@
 import { Flag, Trophy } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { LiveIndicator } from "@/components/live-indicator";
 import { Podium } from "@/components/podium";
 import { BRAND } from "@/lib/brand";
 import { PODIUM_SIZE, SEX_LABEL } from "@/lib/categories";
@@ -19,6 +20,8 @@ type View = "classificacao" | "premiacao" | "alternar";
 type Ranked = ResultRow & { position: number };
 
 const ALTERNATE_MS = 40_000;
+/** O telão confere o servidor a cada 3 s (além do tempo real). */
+const TELAO_LIVE_MS = 3_000;
 const NEW_ARRIVAL_MS = 20_000;
 const RECENT_COUNT = 4;
 // ouro, prata, bronze; 4º e 5º premiados com contorno rosa
@@ -51,7 +54,7 @@ function useTelaoSettings() {
 
 export function TelaoBoard({ race }: { race: Race }) {
   const athletes = useAthletes(race.id);
-  const { finishes, status } = useFinishes(race.id, () => {});
+  const { finishes, status } = useFinishes(race.id, () => {}, { liveMs: TELAO_LIVE_MS });
   const clock = useServerClock();
   const { view, setView, sex, setSex } = useTelaoSettings();
   const [alternate, setAlternate] = useState<"classificacao" | "premiacao">("classificacao");
@@ -112,7 +115,6 @@ export function TelaoBoard({ race }: { race: Race }) {
               {race.status === "finished" && <span className="text-gold">Resultado final</span>}
               {race.status !== "not_started" && <span className="text-white/25">·</span>}
               <span>{distance.toLocaleString("pt-BR")} km</span>
-              {!status.online && <span className="text-gold">· sem conexão</span>}
             </p>
             <p className="truncate text-[2.6vw] leading-tight font-bold tracking-tight">{race.name}</p>
           </div>
@@ -178,7 +180,10 @@ export function TelaoBoard({ race }: { race: Race }) {
       </main>
 
       <footer className="relative flex items-center justify-between px-[3vw] pb-[1vw] text-[0.95vw] text-white/35">
-        <span>{BRAND.name}</span>
+        <span className="flex items-center gap-[1.2vw]">
+          {BRAND.name}
+          <LiveIndicator status={status} dark />
+        </span>
         {/* controles discretos */}
         <div className="flex gap-2 text-sm opacity-40 transition-opacity focus-within:opacity-100 hover:opacity-100">
           <select aria-label="Visão" value={view} onChange={(e) => setView(e.target.value as View)} className="rounded-lg bg-white/10 px-2 py-1 text-white">

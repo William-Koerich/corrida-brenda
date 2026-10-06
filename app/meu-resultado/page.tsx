@@ -4,6 +4,7 @@ import { ChevronRight, Search, Trophy } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { RaceGate } from "@/components/app-shell";
+import { LiveIndicator } from "@/components/live-indicator";
 import { Card, EmptyState } from "@/components/ui/card";
 import { inputClass } from "@/components/ui/field";
 import { searchRunners, type RunnerEntry } from "@/lib/runners";
@@ -18,7 +19,7 @@ export default function MeuResultadoPage() {
 }
 
 function RunnerSearch({ race }: { race: Race }) {
-  const { entries, totalFinishers } = useRunners(race);
+  const { entries, totalFinishers, status } = useRunners(race);
   const [query, setQuery] = useState("");
   const found = useMemo(() => searchRunners(entries, query), [entries, query]);
   const date = race.start_time ? new Date(race.start_time).toLocaleDateString("pt-BR") : null;
@@ -34,6 +35,7 @@ function RunnerSearch({ race }: { race: Race }) {
             {Number(race.distance_km).toLocaleString("pt-BR")} km{date && ` · ${date}`} · {totalFinishers}{" "}
             {totalFinishers === 1 ? "atleta chegou" : "atletas chegaram"}
           </p>
+          <LiveIndicator status={status} dark className="mt-3 text-xs font-medium" />
         </div>
       </section>
 

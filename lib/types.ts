@@ -20,6 +20,8 @@ export interface Athlete {
   sex: Sex;
   bib_number: number;
   created_at: string;
+  /** última alteração (servidor); usado na atualização incremental */
+  updated_at?: string;
 }
 
 export interface Finish {
@@ -30,4 +32,6 @@ export interface Finish {
   device_id: string | null;
   client_id: string;
   created_at: string;
+  /** última alteração (servidor); usado na atualização incremental */
+  updated_at?: string;
 }
