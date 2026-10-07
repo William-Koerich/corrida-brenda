@@ -1,6 +1,6 @@
 "use client";
 
-import { Camera, CheckCircle2, ChevronLeft, Keyboard, Lock, TriangleAlert } from "lucide-react";
+import { Camera, CheckCircle2, ChevronLeft, Keyboard, Lock, Maximize2, SwitchCamera, TriangleAlert, Volume2, VolumeX, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert } from "@/components/ui/card";
@@ -11,13 +11,16 @@ import { getDeviceId } from "@/lib/device";
 import { pendingFinishes, resolveBib } from "@/lib/finish-logic";
 import { newFinish } from "@/lib/finishes";
 import { useServerClock } from "@/lib/server-clock";
+import { playTone, unlockAudio, type Tone } from "@/lib/sound";
 import { elapsedMs, formatDuration, formatPace } from "@/lib/time";
 import type { Athlete, Finish, Race } from "@/lib/types";
-import { useAthletes, useFinishes } from "@/lib/use-race-data";
+import { useAthletes, useFinishes, type SyncStatus } from "@/lib/use-race-data";
+import { useStoredState } from "@/lib/use-stored-state";
+import { useWakeLock } from "@/lib/use-wake-lock";
 import { Stopwatch } from "../stopwatch";
 import { SyncBar } from "../sync-indicator";
 import { Keypad } from "./keypad";
-import { QrScanner } from "./qr-scanner";
+import { QrScanner, type CameraFacing } from "./qr-scanner";
 import { RecentList } from "./recent-list";
 
 type Feedback =
@@ -29,32 +32,9 @@ const VIBRATE_OK = 200;
 const VIBRATE_ERROR = [120, 80, 120, 80, 120];
 
 type InputMode = "keypad" | "camera";
-const MODE_KEY = "corrida.chegada.modo";
-
-/** Teclado ou câmera; lembra a escolha neste aparelho. */
-function useInputMode() {
-  const [mode, setMode] = useState<InputMode>("keypad");
-
-  useEffect(() => {
-    try {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- preferência salva só existe no navegador
-      if (localStorage.getItem(MODE_KEY) === "camera") setMode("camera");
-    } catch {
-      // sem storage: fica no teclado
-    }
-  }, []);
-
-  const change = useCallback((next: InputMode) => {
-    setMode(next);
-    try {
-      localStorage.setItem(MODE_KEY, next);
-    } catch {
-      // sem storage: vale só nesta sessão
-    }
-  }, []);
-
-  return [mode, change] as const;
-}
+const INPUT_MODES = ["keypad", "camera"] as const;
+const FACINGS = ["environment", "user"] as const;
+const SOUND = ["on", "off"] as const;
 
 function vibrate(pattern: number | number[]) {
   try {
@@ -77,7 +57,40 @@ export function FinishStation({ race }: { race: Race }) {
   const [input, setInput] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<Finish | null>(null);
-  const [mode, setMode] = useInputMode();
+  // preferências guardadas neste aparelho
+  const [mode, setMode] = useStoredState<InputMode>("corrida.chegada.modo", "keypad", INPUT_MODES);
+  const [facing, setFacing] = useStoredState<CameraFacing>("corrida.chegada.camera", "environment", FACINGS);
+  const [sound, setSound] = useStoredState<"on" | "off">("corrida.chegada.som", "on", SOUND);
+  const [fullscreen, setFullscreen] = useState(false);
+  const cameraActive = mode === "camera";
+  useWakeLock(fullscreen && cameraActive);
+
+  // navegadores só liberam áudio depois de um toque: destrava no primeiro toque na tela
+  useEffect(() => {
+    document.addEventListener("pointerdown", unlockAudio, { capture: true });
+    return () => document.removeEventListener("pointerdown", unlockAudio, { capture: true });
+  }, []);
+  const beep = (tone: Tone) => {
+    if (sound === "on") playTone(tone);
+  };
+
+  function openFullscreen() {
+    setFullscreen(true);
+    // esconde a barra do navegador onde dá (Android/computador); no iPhone a tela cheia é só no app
+    document.documentElement.requestFullscreen?.().catch(() => {});
+  }
+  const closeFullscreen = useCallback(() => {
+    setFullscreen(false);
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  }, []);
+  useEffect(() => {
+    if (!fullscreen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeFullscreen();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [fullscreen, closeFullscreen]);
 
   const athletesById = useMemo(
     () => new Map([...athletes.byBib.values()].map((a) => [a.id, a])),
@@ -128,6 +141,10 @@ export function FinishStation({ race }: { race: Race }) {
 
   /** Número vindo do teclado ou da câmera. */
   async function submitBib(bib: number, source: InputMode) {
+    // som só nas leituras da câmera (quem digita já está olhando a tela)
+    const tone = (t: Tone) => {
+      if (source === "camera") beep(t);
+    };
     let result = resolveBib(bib, athletes.byBib, finishes, target);
     if (result.kind === "not_found") {
       // pode ter sido cadastrado depois que a tela abriu
@@ -136,15 +153,18 @@ export function FinishStation({ race }: { race: Race }) {
 
     switch (result.kind) {
       case "not_found":
+        tone("error");
         showError(`Número ${bib} não cadastrado`, "Confira o número no peito do atleta.");
         return;
       case "duplicate": {
         const { time } = describe(result.existing.finish_time);
         if (source === "camera" && result.existing.device_id === deviceId) {
           // mesmo peito ainda na frente da câmera: só lembra, sem alarme
+          tone("info");
           setFeedback({ kind: "info", title: `Nº ${bib} já registrado`, detail: `${result.athlete.name} · ${time}` });
           return;
         }
+        tone("error");
         showError(`Nº ${bib} já chegou`, `${result.athlete.name} · ${time}. A chegada não foi duplicada.`);
         return;
       }
@@ -152,20 +172,28 @@ export function FinishStation({ race }: { race: Race }) {
         assign(result.target.client_id, result.athlete);
         setSelectedId(null);
         vibrate(VIBRATE_OK);
+        tone("ok");
         setFeedback({ kind: "ok", athlete: result.athlete, ...describe(result.target.finish_time) });
         return;
       case "create": {
         if (finished) {
+          tone("error");
           showError("Corrida encerrada", "Novas chegadas não são aceitas. Só dá para identificar as já registradas.");
           return;
         }
         const f = newFinish(race.id, clock.now(), result.athlete.id, deviceId);
         add(f);
         vibrate(VIBRATE_OK);
+        tone("ok");
         setFeedback({ kind: "ok", athlete: result.athlete, ...describe(f.finish_time) });
         return;
       }
     }
+  }
+
+  function invalidQr(text: string) {
+    beep("error");
+    showError("QR Code não reconhecido", `Conteúdo: "${text.slice(0, 40)}". Esperado só o número.`);
   }
 
   const deletingAthlete = deleting?.athlete_id ? athletesById.get(deleting.athlete_id) : undefined;
@@ -295,12 +323,16 @@ export function FinishStation({ race }: { race: Race }) {
           {mode === "keypad" ? (
             <Keypad value={input} onChange={setInput} onSubmit={handleSubmit} />
           ) : (
-            <QrScanner
-              onScan={(bib) => submitBib(bib, "camera")}
-              onInvalid={(text) =>
-                showError("QR Code não reconhecido", `Conteúdo: "${text.slice(0, 40)}". Esperado só o número.`)
-              }
-            />
+            <>
+              {!fullscreen && <QrScanner facing={facing} onScan={(bib) => submitBib(bib, "camera")} onInvalid={invalidQr} />}
+              <CameraControls
+                facing={facing}
+                sound={sound}
+                onFacing={setFacing}
+                onSound={setSound}
+                onFullscreen={openFullscreen}
+              />
+            </>
           )}
         </>
       )}
@@ -320,6 +352,24 @@ export function FinishStation({ race }: { race: Race }) {
           onDelete={setDeleting}
         />
       </section>
+
+      {fullscreen && cameraActive && canEnterNumber && (
+        <FullscreenCamera
+          raceName={race.name}
+          clock={startMs !== null && race.status === "running" ? <Stopwatch startMs={startMs} now={clock.now} className="text-2xl font-semibold" /> : null}
+          syncStatus={syncStatus}
+          pendingCount={pending.length}
+          feedback={feedback}
+          facing={facing}
+          sound={sound}
+          onFacing={setFacing}
+          onSound={setSound}
+          onClose={closeFullscreen}
+          onScan={(bib) => submitBib(bib, "camera")}
+          onInvalid={invalidQr}
+          onDismissFeedback={() => setFeedback(null)}
+        />
+      )}
 
       <ConfirmDialog
         open={deleting !== null}
@@ -369,6 +419,172 @@ function FeedbackBox({ feedback, onClose }: { feedback: Feedback; onClose: () =>
         <span className="block text-lg leading-tight font-semibold">{feedback.title}</span>
         {feedback.detail && <span className="block text-sm leading-tight text-white/85">{feedback.detail}</span>}
       </span>
+    </button>
+  );
+}
+
+function CameraControls({
+  facing,
+  sound,
+  onFacing,
+  onSound,
+  onFullscreen,
+  dark = false,
+}: {
+  facing: CameraFacing;
+  sound: "on" | "off";
+  onFacing: (f: CameraFacing) => void;
+  onSound: (s: "on" | "off") => void;
+  onFullscreen?: () => void;
+  dark?: boolean;
+}) {
+  const btn = dark
+    ? "flex h-11 items-center justify-center gap-2 rounded-xl bg-white/15 px-3 text-sm font-semibold text-white backdrop-blur active:scale-95"
+    : "flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-white px-3 text-sm font-semibold text-ink shadow-sm ring-1 ring-line active:scale-95";
+  return (
+    <div className={`flex gap-2 ${dark ? "" : "w-full"}`}>
+      <button
+        type="button"
+        className={btn}
+        onClick={() => onFacing(facing === "environment" ? "user" : "environment")}
+        aria-label={facing === "environment" ? "Usar câmera frontal" : "Usar câmera traseira"}
+      >
+        <SwitchCamera size={18} />
+        {facing === "environment" ? "Frontal" : "Traseira"}
+      </button>
+      <button
+        type="button"
+        className={btn}
+        onClick={() => onSound(sound === "on" ? "off" : "on")}
+        aria-label={sound === "on" ? "Desligar som" : "Ligar som"}
+        aria-pressed={sound === "on"}
+      >
+        {sound === "on" ? <Volume2 size={18} /> : <VolumeX size={18} />}
+        {dark ? null : sound === "on" ? "Som ligado" : "Som desligado"}
+      </button>
+      {onFullscreen && (
+        <button type="button" className={btn} onClick={onFullscreen} aria-label="Tela cheia">
+          <Maximize2 size={18} />
+          Tela cheia
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Câmera em tela cheia: celular/tablet fixo na chegada, virado para os corredores
+ * (normalmente com a câmera frontal). Confirmação grande, legível a alguns metros.
+ */
+function FullscreenCamera({
+  raceName,
+  clock,
+  syncStatus,
+  pendingCount,
+  feedback,
+  facing,
+  sound,
+  onFacing,
+  onSound,
+  onClose,
+  onScan,
+  onInvalid,
+  onDismissFeedback,
+}: {
+  raceName: string;
+  clock: React.ReactNode;
+  syncStatus: SyncStatus;
+  pendingCount: number;
+  feedback: Feedback | null;
+  facing: CameraFacing;
+  sound: "on" | "off";
+  onFacing: (f: CameraFacing) => void;
+  onSound: (s: "on" | "off") => void;
+  onClose: () => void;
+  onScan: (bib: number) => void;
+  onInvalid: (text: string) => void;
+  onDismissFeedback: () => void;
+}) {
+  return (
+    <div data-testid="camera-fullscreen" className="fixed inset-0 z-50 bg-black text-white">
+      <div className="absolute inset-0">
+        <QrScanner fill facing={facing} onScan={onScan} onInvalid={onInvalid} />
+      </div>
+
+      {/* topo: corrida, cronômetro, conexão e controles */}
+      <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-3 bg-linear-to-b from-black/70 to-transparent p-4 pt-[max(1rem,env(safe-area-inset-top))]">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-white/80">{raceName}</p>
+          {clock}
+          {(!syncStatus.online || syncStatus.pending > 0) && (
+            <p className="text-xs font-semibold text-amber-300">
+              {syncStatus.online ? "Enviando" : "Offline"} · {syncStatus.pending} pendente{syncStatus.pending === 1 ? "" : "s"}
+            </p>
+          )}
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <CameraControls dark facing={facing} sound={sound} onFacing={onFacing} onSound={onSound} />
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Sair da tela cheia"
+            className="flex size-11 items-center justify-center rounded-xl bg-white/15 backdrop-blur active:scale-95"
+          >
+            <X size={20} />
+          </button>
+        </div>
+      </div>
+
+      {/* guia de enquadramento (a leitura usa a imagem inteira) */}
+      <div className="pointer-events-none absolute inset-x-[10%] top-[22%] bottom-[30%] rounded-3xl border-4 border-dashed border-white/40" />
+
+      {/* confirmação grande */}
+      <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/80 to-transparent p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        {feedback ? (
+          <BigFeedback feedback={feedback} onClose={onDismissFeedback} />
+        ) : (
+          <p className="rounded-3xl bg-white/10 px-5 py-6 text-center text-xl font-semibold backdrop-blur">
+            Mostre o QR Code do número de peito
+            {pendingCount > 0 && (
+              <span className="mt-1 block text-sm font-medium text-amber-300">
+                {pendingCount} chegada{pendingCount === 1 ? "" : "s"} aguardando número
+              </span>
+            )}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function BigFeedback({ feedback, onClose }: { feedback: Feedback; onClose: () => void }) {
+  if (feedback.kind === "ok") {
+    return (
+      <button
+        data-testid="feedback-big"
+        onClick={onClose}
+        className="flex w-full items-center gap-4 rounded-3xl bg-emerald-600 p-5 text-left shadow-2xl"
+      >
+        <span className="tabular flex h-24 min-w-24 items-center justify-center rounded-2xl bg-white px-3 font-mono text-5xl font-black text-emerald-700">
+          {feedback.athlete.bib_number}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-3xl font-bold">{feedback.athlete.name}</span>
+          <span className="tabular block font-mono text-3xl font-semibold">{feedback.time}</span>
+          <span className="block text-lg text-white/85">{feedback.pace}</span>
+        </span>
+        <CheckCircle2 size={40} className="shrink-0" />
+      </button>
+    );
+  }
+  return (
+    <button
+      data-testid="feedback-big"
+      onClick={onClose}
+      className={`w-full rounded-3xl p-5 text-left shadow-2xl ${feedback.kind === "error" ? "bg-red-600" : "bg-white/15 backdrop-blur"}`}
+    >
+      <span className="block text-3xl font-bold">{feedback.title}</span>
+      {feedback.detail && <span className="mt-1 block text-lg text-white/90">{feedback.detail}</span>}
     </button>
   );
 }

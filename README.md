@@ -165,6 +165,20 @@ Na chave **Teclado | Câmera (QR)**, a opção Câmera abre a câmera traseira. 
   - página aberta sem HTTPS.
 - A escolha entre teclado e câmera fica salva no aparelho.
 
+**Opções da câmera** (botões abaixo do vídeo, salvos no aparelho):
+
+- **Frontal / Traseira:** a frontal aparece espelhada, como um espelho, e a leitura não é afetada.
+- **Som ligado / desligado:** cada som indica um resultado diferente.
+  - Dois bipes subindo: leitura aceita.
+  - Dois toques graves: número não cadastrado, atleta que já chegou ou QR inválido.
+  - Um bipe curto: o mesmo peito lido de novo.
+
+  Os sons são gerados no próprio celular e funcionam offline. Navegadores só liberam som depois de um toque na tela; a tela de chegada faz isso no primeiro toque. No iPhone com Safari 17 ou mais novo, o som toca mesmo com a chave do silencioso ligada.
+- **Tela cheia:** a câmera ocupa a tela inteira, com a confirmação em tamanho grande (número, nome, tempo e ritmo). Serve para deixar um celular ou tablet **fixo na chegada**, virado para os corredores (com a câmera frontal), para que eles mostrem o próprio número de peito.
+  - Nesse modo, a tela **não apaga sozinha**.
+  - No Android e no computador, a barra do navegador também some. No iPhone, isso só acontece com o app instalado na tela inicial.
+  - Para sair, use o **X** ou a tecla Esc.
+
 ## Modo offline
 
 A tela de chegada continua funcionando sem internet.

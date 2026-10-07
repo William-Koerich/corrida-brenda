@@ -6,9 +6,15 @@ import { cameraErrorMessage, parseBibFromQr, ScanDebouncer } from "@/lib/qr";
 
 type Status = { kind: "starting" } | { kind: "running" } | { kind: "error"; message: string };
 
+export type CameraFacing = "environment" | "user";
+
 interface Props {
   onScan: (bib: number) => void;
   onInvalid: (text: string) => void;
+  /** traseira (padrão) ou frontal */
+  facing?: CameraFacing;
+  /** ocupa todo o espaço do pai (modo tela cheia) em vez de 4:3 */
+  fill?: boolean;
 }
 
 /** Intervalo mínimo entre leituras (o decodificador em JS no iPhone leva mais tempo por quadro). */
@@ -55,7 +61,7 @@ async function createDetector(): Promise<Detector> {
 }
 
 /** Câmera traseira lendo QR Codes continuamente. */
-export function QrScanner({ onScan, onInvalid }: Props) {
+export function QrScanner({ onScan, onInvalid, facing = "environment", fill = false }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [status, setStatus] = useState<Status>({ kind: "starting" });
   const [attempt, setAttempt] = useState(0);
@@ -81,7 +87,7 @@ export function QrScanner({ onScan, onInvalid }: Props) {
         stream = await navigator.mediaDevices.getUserMedia({
           audio: false,
           video: {
-            facingMode: "environment",
+            facingMode: facing,
             width: { ideal: 1920 },
             height: { ideal: 1080 },
             // foco contínuo onde o aparelho permite (Android)
@@ -122,14 +128,21 @@ export function QrScanner({ onScan, onInvalid }: Props) {
       clearTimeout(timer);
       stream?.getTracks().forEach((t) => t.stop());
     };
-  }, [attempt]);
+  }, [attempt, facing]);
 
   return (
-    <div className="relative flex flex-col gap-2">
-      <div className="aspect-4/3 w-full overflow-hidden rounded-2xl bg-ink">
-        <video ref={videoRef} playsInline muted className="h-full w-full object-cover" />
+    <div className={`relative flex flex-col gap-2 ${fill ? "h-full" : ""}`}>
+      <div className={`w-full overflow-hidden bg-ink ${fill ? "h-full" : "aspect-4/3 rounded-2xl"}`}>
+        <video
+          ref={videoRef}
+          playsInline
+          muted
+          data-facing={facing}
+          // frontal espelhada, como um espelho (a leitura usa a imagem original, sem espelho)
+          className={`h-full w-full object-cover ${facing === "user" ? "-scale-x-100" : ""}`}
+        />
       </div>
-      {status.kind === "running" && (
+      {status.kind === "running" && !fill && (
         // só orientação: a leitura usa a imagem inteira
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-end p-3">
           <div className="absolute inset-[12%] rounded-2xl border-2 border-dashed border-white/50" />
