@@ -245,6 +245,15 @@ Nenhuma tela precisa ser recarregada. Cada uma se mantém atualizada de dois jei
   - **Story** (1080×1920), para o Instagram;
   - **Quadrado** (1080×1080), para o feed e o Strava.
 
+  O layout segue o padrão dos posts de atividade do Strava:
+  - título da corrida;
+  - os números em destaque: distância, ritmo e tempo ("13m 21s");
+  - a classificação.
+
+  Ele não usa a marca, o logo nem a cor do Strava.
+  - **Foto de fundo (opcional):** o corredor pode escolher uma foto, que ocupa a imagem inteira com um escurecimento embaixo para os números ficarem legíveis. A foto é processada só no celular e não é enviada para lugar nenhum. Sem foto, fica o fundo escuro com brilho rosa.
+  - **Percurso:** o traçado da prova (`public/percurso-corrida-brenda.png`, PNG com fundo transparente) entra por padrão acima dos números, com ou sem foto. O botão **Tirar percurso da imagem** desliga. Para outra prova, troque o arquivo e o caminho em `ROUTE_IMAGE` (`lib/brand.ts`).
+
   O botão **Compartilhar** abre o menu do celular (Instagram, Strava, WhatsApp…). Se o aparelho não tiver esse menu, a imagem é baixada.
 - **Strava:** o Strava não aceita publicação direta por site sem integração com login da conta. O corredor salva a imagem e adiciona como foto da atividade.
 - A página atualiza em tempo real: quem acabou de chegar já encontra o resultado.

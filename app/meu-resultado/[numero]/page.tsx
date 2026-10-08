@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Check, Download, Link2, Share2, Timer, Trophy } from "lucide-react";
+import { ArrowLeft, Check, Download, ImagePlus, Link2, Route, Share2, Timer, Trophy, X } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -9,10 +9,18 @@ import { LiveIndicator } from "@/components/live-indicator";
 import { Button } from "@/components/ui/button";
 import { Card, EmptyState } from "@/components/ui/card";
 import { Segmented } from "@/components/ui/segmented";
-import { BRAND } from "@/lib/brand";
+import { BRAND, ROUTE_IMAGE } from "@/lib/brand";
 import { SEX_LABEL } from "@/lib/categories";
 import type { RunnerEntry } from "@/lib/runners";
-import { downloadBlob, renderResultCard, shareOrDownload, type CardData, type CardFormat } from "@/lib/share-card";
+import {
+  downloadBlob,
+  loadCardImage,
+  renderResultCard,
+  shareOrDownload,
+  type CardData,
+  type CardFormat,
+  type CardImage,
+} from "@/lib/share-card";
 import { formatDuration, formatPace } from "@/lib/time";
 import type { Race } from "@/lib/types";
 import { useRunners } from "../use-runners";
@@ -69,6 +77,24 @@ function ResultView({ race, entry, totalFinishers }: { race: Race; entry: Runner
   const [format, setFormat] = useState<CardFormat>("story");
   const [card, setCard] = useState<{ blob: Blob; url: string } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // foto de fundo opcional: processada só no aparelho, nunca enviada
+  const [photo, setPhoto] = useState<CardImage | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  // traçado do percurso: entra por padrão, o corredor pode tirar
+  const [route, setRoute] = useState<CardImage | null>(null);
+  const [showRoute, setShowRoute] = useState(true);
+  const [routeChecked, setRouteChecked] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    loadCardImage(ROUTE_IMAGE)
+      .then((img) => !cancelled && setRoute(img))
+      .catch(() => {})
+      .finally(() => !cancelled && setRouteChecked(true));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const activeRoute = showRoute ? route : null;
 
   const data: CardData = useMemo(
     () => ({
@@ -78,8 +104,7 @@ function ResultView({ race, entry, totalFinishers }: { race: Race; entry: Runner
       date: race.start_time ? new Date(race.start_time).toLocaleDateString("pt-BR") : null,
       name: athlete.name,
       bib: athlete.bib_number,
-      time,
-      pace,
+      elapsedMs: row.elapsedMs,
       overall: row.overall,
       totalFinishers,
       sexLabel,
@@ -88,7 +113,7 @@ function ResultView({ race, entry, totalFinishers }: { race: Race; entry: Runner
       prize: entry.prize,
       url: publicUrl(athlete.bib_number),
     }),
-    [race, distance, athlete, time, pace, row.overall, totalFinishers, sexLabel, entry],
+    [race, distance, athlete, row.elapsedMs, row.overall, totalFinishers, sexLabel, entry],
   );
 
   // a imagem fica pronta antes do toque: o menu de compartilhar precisa abrir direto do clique.
@@ -97,7 +122,9 @@ function ResultView({ race, entry, totalFinishers }: { race: Race; entry: Runner
   const lastUrl = useRef<string | null>(null);
   useEffect(() => {
     let cancelled = false;
-    renderResultCard(JSON.parse(dataKey) as CardData, format).then((blob) => {
+    // espera o percurso carregar para não mostrar uma imagem sem ele e logo trocar
+    if (!routeChecked) return;
+    renderResultCard(JSON.parse(dataKey) as CardData, format, { photo, route: activeRoute }).then((blob) => {
       if (cancelled) return;
       const url = URL.createObjectURL(blob);
       // a imagem anterior só é descartada depois que a nova está pronta
@@ -108,7 +135,7 @@ function ResultView({ race, entry, totalFinishers }: { race: Race; entry: Runner
     return () => {
       cancelled = true;
     };
-  }, [dataKey, format]);
+  }, [dataKey, format, photo, activeRoute, routeChecked]);
   useEffect(
     () => () => {
       if (lastUrl.current) URL.revokeObjectURL(lastUrl.current);
@@ -123,6 +150,23 @@ function ResultView({ race, entry, totalFinishers }: { race: Race; entry: Runner
     if (!card) return;
     const result = await shareOrDownload(card.blob, fileName, shareText);
     if (result === "downloaded") setNotice("Imagem salva. Abra o Instagram ou o Strava e escolha a foto.");
+  }
+
+  async function pickPhoto(file: File | undefined) {
+    if (!file) return;
+    try {
+      const next = await loadCardImage(file);
+      setCard(null);
+      setPhoto(next);
+      setNotice(null);
+    } catch {
+      setNotice("Não foi possível abrir essa foto. Tente outra.");
+    }
+  }
+
+  function removePhoto() {
+    setCard(null);
+    setPhoto(null);
   }
 
   async function copyLink() {
@@ -179,6 +223,44 @@ function ResultView({ race, entry, totalFinishers }: { race: Race; entry: Runner
             ]}
           />
         </div>
+
+        <div className="mt-3 flex gap-2">
+          <input
+            ref={fileInput}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            data-testid="photo-input"
+            onChange={(e) => {
+              pickPhoto(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+          <Button icon={<ImagePlus size={16} />} onClick={() => fileInput.current?.click()} className="flex-1">
+            {photo ? "Trocar foto" : "Adicionar foto de fundo"}
+          </Button>
+          {photo && (
+            <Button icon={<X size={16} />} onClick={removePhoto}>
+              Remover foto
+            </Button>
+          )}
+        </div>
+        <p className="mt-1.5 text-xs text-ink-soft">
+          Opcional. A foto fica só no seu celular, não é enviada para lugar nenhum.
+        </p>
+        {route && (
+          <Button
+            icon={<Route size={16} />}
+            aria-pressed={showRoute}
+            onClick={() => {
+              setCard(null);
+              setShowRoute((v) => !v);
+            }}
+            className="mt-3 w-full"
+          >
+            {showRoute ? "Tirar percurso da imagem" : "Mostrar percurso na imagem"}
+          </Button>
+        )}
 
         <div className="mt-4 flex justify-center rounded-2xl bg-canvas p-4">
           {card ? (
