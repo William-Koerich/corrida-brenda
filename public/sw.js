@@ -1,4 +1,4 @@
-// Service worker da Cronometragem 3 km.
+// Service worker da Cronometragem.
 // - /_next/static/*: cache primeiro (arquivos com hash, nunca mudam)
 // - páginas: rede primeiro; sem internet, a última versão guardada
 // - Supabase e outros domínios: não passam por aqui (a fila offline cuida disso)

@@ -36,7 +36,7 @@ Aplicação web (PWA, mobile-first) para cronometrar corridas de rua, com classi
      ```
      Esses dados do banco servem só para aplicar a migração. O app usa apenas a URL e a chave publishable (passo 2).
    - **Supabase CLI:** `supabase link` e depois `supabase db push`.
-3. (Opcional) Rode `supabase/seed.sql` para criar a corrida “Corrida 3 km”.
+3. (Opcional) Rode `supabase/seed.sql` para criar a corrida “Corrida 3,1 km”.
 
 A migração cria:
 
