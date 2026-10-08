@@ -37,6 +37,12 @@ describe("pace", () => {
     expect(formatPace(12 * 60_000, 3)).toBe("4:00 /km");
   });
 
+  it("percurso de 3,1 km (distância vinda do banco como texto)", () => {
+    expect(formatPace(15 * 60_000 + 30_000, Number("3.1"))).toBe("5:00 /km");
+    expect(formatPace(13 * 60_000 + 21_000, Number("3.1"))).toBe("4:18 /km");
+    expect(formatPace(31 * 60_000, Number("3.1"))).toBe("10:00 /km");
+  });
+
   it("arredonda o segundo sem gerar 60", () => {
     // 5:59.8 /km → 6:00 /km
     expect(formatPace(3 * 359_800, 3)).toBe("6:00 /km");
