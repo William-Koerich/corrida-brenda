@@ -328,6 +328,53 @@ export async function renderResultCard(data: CardData, format: CardFormat, { pho
 }
 
 /**
+ * Adesivo de fundo transparente, como o do Strava: o percurso com distância, ritmo e tempo
+ * embaixo. O corredor cola por cima da própria foto ou story.
+ */
+export async function renderRouteSticker(data: CardData, route: CardImage): Promise<Blob> {
+  const w = 1080;
+  const routeH = 760;
+  const S = { label: 30, value: 84, gap: 56 };
+  const statRow = S.label + 18 + S.value;
+  const h = routeH + S.gap + statRow + 24;
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d") as Ctx;
+  const { sans, display } = fonts();
+  await Promise.all([document.fonts?.load(`800 80px ${display}`), document.fonts?.load(`600 40px ${display}`)].filter(Boolean)).catch(() => {});
+  await document.fonts?.ready;
+
+  // sombra leve: o adesivo precisa ser legível em cima de foto clara ou escura
+  ctx.shadowColor = "rgba(0,0,0,0.45)";
+  ctx.shadowBlur = 14;
+
+  const box = containRect(route.width, route.height, 40, 0, w - 80, routeH);
+  ctx.drawImage(route.image, box.x, box.y, box.w, box.h);
+
+  const [pace] = formatPace(data.elapsedMs, data.distanceKm).split(" ");
+  const cols = [
+    { label: "Distância", parts: stravaDistance(data.distanceKm) },
+    { label: "Ritmo", parts: [{ value: pace, unit: " /km" }] },
+    { label: "Tempo", parts: stravaTime(data.elapsedMs) },
+  ];
+  const pad = 60;
+  const colW = (w - pad * 2) / 3;
+  const y = routeH + S.gap;
+  cols.forEach((c, i) => {
+    const x = pad + i * colW;
+    ctx.font = `600 ${S.label}px ${sans}`;
+    ctx.fillStyle = COLORS.white;
+    ctx.fillText(c.label, x, y + S.label);
+    drawStatValue(ctx, c.parts, x, y + statRow, colW - 20, S.value, display, COLORS.white);
+  });
+
+  return new Promise((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Falha ao gerar a imagem"))), "image/png"),
+  );
+}
+
+/**
  * Carrega uma imagem para o canvas (arquivo escolhido ou endereço): aplica a rotação da
  * câmera (EXIF) e reduz para no máximo 2160 px, o que basta para a imagem final e deixa
  * o redesenho rápido no celular.

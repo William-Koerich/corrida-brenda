@@ -16,6 +16,7 @@ import {
   downloadBlob,
   loadCardImage,
   renderResultCard,
+  renderRouteSticker,
   shareOrDownload,
   type CardData,
   type CardFormat,
@@ -150,6 +151,17 @@ function ResultView({ race, entry, totalFinishers }: { race: Race; entry: Runner
     if (!card) return;
     const result = await shareOrDownload(card.blob, fileName, shareText);
     if (result === "downloaded") setNotice("Imagem salva. Abra o Instagram ou o Strava e escolha a foto.");
+  }
+
+  async function shareSticker() {
+    if (!route) return;
+    try {
+      const blob = await renderRouteSticker(JSON.parse(dataKey) as CardData, route);
+      const result = await shareOrDownload(blob, `percurso-${athlete.bib_number}.png`, shareText);
+      if (result === "downloaded") setNotice("Percurso salvo. No story do Instagram, adicione como figurinha de foto.");
+    } catch {
+      setNotice("Não foi possível gerar o percurso. Tente de novo.");
+    }
   }
 
   async function pickPhoto(file: File | undefined) {
@@ -287,6 +299,16 @@ function ResultView({ race, entry, totalFinishers }: { race: Race; entry: Runner
             Copiar link
           </Button>
         </div>
+        {route && (
+          <div className="mt-4 border-t border-line pt-4">
+            <Button icon={<Route size={16} />} onClick={shareSticker} className="w-full">
+              Baixar só o percurso
+            </Button>
+            <p className="mt-1.5 text-xs text-ink-soft">
+              Fundo transparente, com distância, ritmo e tempo, para colar na sua própria foto ou story, como no Strava.
+            </p>
+          </div>
+        )}
         {notice && <p className="mt-3 text-center text-sm font-medium text-ink-soft">{notice}</p>}
         <p className="mt-3 text-center text-xs text-ink-soft">
           No Strava: salve a imagem e adicione como foto na sua atividade.
