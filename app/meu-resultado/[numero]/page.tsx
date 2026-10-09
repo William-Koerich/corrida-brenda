@@ -112,7 +112,7 @@ function ResultView({ race, entry, totalFinishers }: { race: Race; entry: Runner
       sexPosition: entry.sexPosition!,
       sexFinishers: entry.sexFinishers,
       prize: entry.prize,
-      url: publicUrl(athlete.bib_number),
+      credit: BRAND.credit,
     }),
     [race, distance, athlete, row.elapsedMs, row.overall, totalFinishers, sexLabel, entry],
   );
@@ -156,7 +156,7 @@ function ResultView({ race, entry, totalFinishers }: { race: Race; entry: Runner
   async function shareSticker() {
     if (!route) return;
     try {
-      const blob = await renderRouteSticker(JSON.parse(dataKey) as CardData, route);
+      const blob = await renderRouteSticker(route);
       const result = await shareOrDownload(blob, `percurso-${athlete.bib_number}.png`, shareText);
       if (result === "downloaded") setNotice("Percurso salvo. No story do Instagram, adicione como figurinha de foto.");
     } catch {
@@ -305,7 +305,7 @@ function ResultView({ race, entry, totalFinishers }: { race: Race; entry: Runner
               Baixar só o percurso
             </Button>
             <p className="mt-1.5 text-xs text-ink-soft">
-              Fundo transparente, com distância, ritmo e tempo, para colar na sua própria foto ou story, como no Strava.
+              Só o desenho do percurso, com fundo transparente, para colar na sua própria foto ou story, como no Strava.
             </p>
           </div>
         )}
@@ -316,14 +316,6 @@ function ResultView({ race, entry, totalFinishers }: { race: Race; entry: Runner
       </Card>
     </>
   );
-}
-
-/** Endereço impresso na imagem; omitido em endereços locais, que não funcionam para quem vê o post. */
-function publicUrl(bib: number): string {
-  if (typeof window === "undefined") return "";
-  const host = window.location.host;
-  const local = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[::1\])/.test(host);
-  return local ? "" : `${host}/meu-resultado/${bib}`;
 }
 
 function Position({ title, pos, total }: { title: string; pos: number; total: number }) {

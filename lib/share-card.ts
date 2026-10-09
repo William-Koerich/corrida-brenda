@@ -22,7 +22,8 @@ export interface CardData {
   sexPosition: number;
   sexFinishers: number;
   prize: boolean;
-  url: string;
+  /** crédito no rodapé da imagem, ex.: "Desenvolvido por @w3ko.tech" (vazio = sem rodapé) */
+  credit: string;
 }
 
 /** Imagem já carregada: foto de fundo do corredor (fica só no aparelho) ou mapa do percurso. */
@@ -240,7 +241,7 @@ export async function renderResultCard(data: CardData, format: CardFormat, { pho
     S.title + 22 + S.meta + S.gap + statRow + S.rowGap + 2 + S.rowGap + statRow + (pill ? S.rowGap + pill : 0);
   const top = markY + mark;
   // no story, longe da barra de resposta do Instagram
-  const bottom = story ? h - 300 : h - (data.url ? 110 : 72);
+  const bottom = story ? h - 300 : h - (data.credit ? 110 : 72);
   let y = photo || route ? bottom - blockH : top + (bottom - top - blockH) / 2;
 
   // percurso no espaço entre a marca e os números
@@ -316,10 +317,10 @@ export async function renderResultCard(data: CardData, format: CardFormat, { pho
     ctx.letterSpacing = "0px";
   }
 
-  if (data.url) {
+  if (data.credit) {
     ctx.font = `500 ${story ? 30 : 26}px ${sans}`;
     ctx.fillStyle = "rgba(255,255,255,0.55)";
-    ctx.fillText(data.url, pad, story ? h - 200 : h - 56);
+    ctx.fillText(data.credit, pad, story ? h - 200 : h - 56);
   }
 
   return new Promise((resolve, reject) =>
@@ -328,46 +329,20 @@ export async function renderResultCard(data: CardData, format: CardFormat, { pho
 }
 
 /**
- * Adesivo de fundo transparente, como o do Strava: o percurso com distância, ritmo e tempo
- * embaixo. O corredor cola por cima da própria foto ou story.
+ * Só o traçado do percurso, com fundo transparente, como o adesivo do Strava: o corredor
+ * cola por cima da própria foto ou story.
  */
-export async function renderRouteSticker(data: CardData, route: CardImage): Promise<Blob> {
-  const w = 1080;
-  const routeH = 760;
-  const S = { label: 30, value: 84, gap: 56 };
-  const statRow = S.label + 18 + S.value;
-  const h = routeH + S.gap + statRow + 24;
+export async function renderRouteSticker(route: CardImage): Promise<Blob> {
+  // folga em volta para a sombra não ser cortada
+  const margin = 40;
   const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
+  canvas.width = route.width + margin * 2;
+  canvas.height = route.height + margin * 2;
   const ctx = canvas.getContext("2d") as Ctx;
-  const { sans, display } = fonts();
-  await Promise.all([document.fonts?.load(`800 80px ${display}`), document.fonts?.load(`600 40px ${display}`)].filter(Boolean)).catch(() => {});
-  await document.fonts?.ready;
-
-  // sombra leve: o adesivo precisa ser legível em cima de foto clara ou escura
+  // sombra leve: o traçado precisa aparecer em cima de foto clara ou escura
   ctx.shadowColor = "rgba(0,0,0,0.45)";
   ctx.shadowBlur = 14;
-
-  const box = containRect(route.width, route.height, 40, 0, w - 80, routeH);
-  ctx.drawImage(route.image, box.x, box.y, box.w, box.h);
-
-  const [pace] = formatPace(data.elapsedMs, data.distanceKm).split(" ");
-  const cols = [
-    { label: "Distância", parts: stravaDistance(data.distanceKm) },
-    { label: "Ritmo", parts: [{ value: pace, unit: " /km" }] },
-    { label: "Tempo", parts: stravaTime(data.elapsedMs) },
-  ];
-  const pad = 60;
-  const colW = (w - pad * 2) / 3;
-  const y = routeH + S.gap;
-  cols.forEach((c, i) => {
-    const x = pad + i * colW;
-    ctx.font = `600 ${S.label}px ${sans}`;
-    ctx.fillStyle = COLORS.white;
-    ctx.fillText(c.label, x, y + S.label);
-    drawStatValue(ctx, c.parts, x, y + statRow, colW - 20, S.value, display, COLORS.white);
-  });
+  ctx.drawImage(route.image, margin, margin);
 
   return new Promise((resolve, reject) =>
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Falha ao gerar a imagem"))), "image/png"),

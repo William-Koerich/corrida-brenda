@@ -254,7 +254,9 @@ Nenhuma tela precisa ser recarregada. Cada uma se mantém atualizada de dois jei
   - **Foto de fundo (opcional):** o corredor pode escolher uma foto, que ocupa a imagem inteira com um escurecimento embaixo para os números ficarem legíveis. A foto é processada só no celular e não é enviada para lugar nenhum. Sem foto, fica o fundo escuro com brilho rosa.
   - **Percurso:** o traçado da prova (`public/percurso-corrida-brenda.png`, PNG com fundo transparente) entra por padrão acima dos números, com ou sem foto. O botão **Tirar percurso da imagem** desliga. Para outra prova, troque o arquivo e o caminho em `ROUTE_IMAGE` (`lib/brand.ts`).
 
-  - **Só o percurso:** o botão **Baixar só o percurso** gera um PNG de fundo transparente com o traçado, a distância, o ritmo e o tempo, como o adesivo do Strava. O corredor cola por cima da própria foto ou story. Ele funciona mesmo com o percurso desligado na imagem.
+  - **Só o percurso:** o botão **Baixar só o percurso** gera um PNG de fundo transparente só com o desenho do percurso, como o adesivo do Strava. O corredor cola por cima da própria foto ou story. Ele funciona mesmo com o percurso desligado na imagem.
+
+  - **Rodapé:** a imagem leva "Desenvolvido por @w3ko.tech" (`BRAND.credit` em `lib/brand.ts`).
 
   O botão **Compartilhar** abre o menu do celular (Instagram, Strava, WhatsApp…). Se o aparelho não tiver esse menu, a imagem é baixada.
 - **Strava:** o Strava não aceita publicação direta por site sem integração com login da conta. O corredor salva a imagem e adiciona como foto da atividade.
